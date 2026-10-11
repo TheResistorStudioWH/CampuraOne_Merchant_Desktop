@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 1,
+  "mainShops": [
+    {
+      "shopID": 1,
+      "shopName": "测试咖啡店",
+      "shopAddress": ["主校区", "生活区", "一楼 A-01"],
+      "shopSlogan": "这是用于测试接口和客户端解析的商户数据",
+      "subShopsList": [1],
+      "productsList": [1, 2, 3, 4],
+      "adIDs": [],
+      "shopLogo": null,
+      "shopImg": null,
+      "saleIDs": [],
+      "schoolID": 1,
+      "areaID": 1,
+      "accountID": 1,
+      "createdAt": "2026-05-27 16:57:23",
+      "updatedAt": "2026-05-27 16:57:23"
+    }
+  ],
+  "subShops": [
+    {
+      "shopID": 1,
+      "shopName": "测试咖啡子商户",
+      "shopAddress": ["主校区", "生活区", "一楼 A-02"],
+      "productsList": [2, 4],
+      "shopImg": null,
+      "mainShopID": 1,
+      "saleList": [],
+      "takeOutLink": null,
+      "accountID": 1,
+      "createdAt": "2026-06-02 19:13:07",
+      "updatedAt": "2026-06-02 19:13:07"
+    }
+  ],
+  "categories": [
+    {
+      "categoryID": 1,
+      "categoryName": "咖啡",
+      "categoryIcon": "cup.and.saucer.fill",
+      "categoryColor": "brown",
+      "createdAt": "2026-06-15 14:15:55",
+      "updatedAt": "2026-06-15 14:15:55"
+    },
+    {
+      "categoryID": 2,
+      "categoryName": "奶茶与茶饮",
+      "categoryIcon": "takeoutbag.and.cup.and.straw.fill",
+      "categoryColor": "orange",
+      "createdAt": "2026-06-15 14:15:55",
+      "updatedAt": "2026-06-15 14:15:55"
+    },
+    {
+      "categoryID": 3,
+      "categoryName": "食品",
+      "categoryIcon": "fork.knife",
+      "categoryColor": "red",
+      "createdAt": "2026-06-15 14:15:55",
+      "updatedAt": "2026-06-15 14:19:16"
+    },
+    {
+      "categoryID": 4,
+      "categoryName": "烘焙甜点",
+      "categoryIcon": "birthday.cake.fill",
+      "categoryColor": "pink",
+      "createdAt": "2026-06-15 14:15:55",
+      "updatedAt": "2026-06-15 14:15:55"
+    },
+    {
+      "categoryID": 5,
+      "categoryName": "水果生鲜",
+      "categoryIcon": "carrot.fill",
+      "categoryColor": "green",
+      "createdAt": "2026-06-15 14:15:55",
+      "updatedAt": "2026-06-15 14:15:55"
+    },
+    {
+      "categoryID": 6,
+      "categoryName": "图书文具",
+      "categoryIcon": "book.closed.fill",
+      "categoryColor": "blue",
+      "createdAt": "2026-06-15 14:15:55",
+      "updatedAt": "2026-06-15 14:15:55"
+    },
+    {
+      "categoryID": 7,
+      "categoryName": "服饰鞋帽",
+      "categoryIcon": "tshirt.fill",
+      "categoryColor": "purple",
+      "createdAt": "2026-06-15 14:15:55",
+      "updatedAt": "2026-06-15 14:15:55"
+    }
+  ],
+  "products": [
+    {
+      "productID": 1,
+      "productName": "测试拿铁",
+      "categoryID": 1,
+      "price": "12.50",
+      "productImg": "assets/demo/images/03-latte-L.png",
+      "productIntro": "这是主商户直营商品",
+      "mainShopID": 1,
+      "subShopID": null,
+      "createdAt": "2026-06-02 19:08:51",
+      "updatedAt": "2026-06-15 14:17:48"
+    },
+    {
+      "productID": 2,
+      "productName": "测试烤肠",
+      "categoryID": 3,
+      "price": "6.00",
+      "productImg": "assets/demo/images/04-sausage-S.png",
+      "productIntro": "这是子商户商品",
+      "mainShopID": 1,
+      "subShopID": 1,
+      "createdAt": "2026-06-02 19:14:05",
+      "updatedAt": "2026-06-15 14:20:07"
+    },
+    {
+      "productID": 3,
+      "productName": "冰美式",
+      "categoryID": 1,
+      "price": "12.00",
+      "productImg": "assets/demo/images/01-americano-S.png",
+      "productIntro": "清爽低糖的经典咖啡，适合课间提神。",
+      "mainShopID": 1,
+      "subShopID": null,
+      "createdAt": "2026-06-05 02:07:26",
+      "updatedAt": "2026-06-15 14:17:48"
+    },
+    {
+      "productID": 4,
+      "productName": "芝士火腿三明治",
+      "categoryID": 3,
+      "price": "18.00",
+      "productImg": "assets/demo/images/02-breakfast-L.png",
+      "productIntro": "现烤吐司搭配芝士、火腿和生菜，适合作为早餐或简餐。",
+      "mainShopID": 1,
+      "subShopID": 1,
+      "createdAt": "2026-06-05 02:07:26",
+      "updatedAt": "2026-06-15 14:20:07"
+    }
+  ]
+}
