@@ -1,6 +1,6 @@
 # Campura One 商家端
 
-面向 Campura One 比赛演示的 Flutter 桌面商家端第一阶段原型。正式目标为 Windows，macOS runner 用于当前开发、预览和测试。学生 Android 端是另一个独立应用，不与本工程共用 runner 或业务状态。
+面向 Campura One 比赛演示的 Flutter 桌面商家端第一阶段原型。正式目标为 Windows，macOS runner 用于当前开发、预览和测试。学生 Android 端虽也使用Flutter进行构建，但其为另一个独立应用，不与本工程共用 runner 或业务状态。
 
 ## 当前功能
 
