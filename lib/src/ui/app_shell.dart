@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../state/app_state.dart';
+import 'appearance_dialog.dart';
 import 'common.dart';
 
 enum _AccountAction { resetData, logout }
@@ -93,6 +94,7 @@ class MerchantAppShell extends ConsumerWidget {
               NavigationRail(
                 extended: extendedRail,
                 minExtendedWidth: 210,
+                groupAlignment: -0.78,
                 labelType: extendedRail
                     ? NavigationRailLabelType.none
                     : NavigationRailLabelType.all,
@@ -176,10 +178,10 @@ class _TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      height: 64,
+      height: 72,
       padding: const EdgeInsets.symmetric(horizontal: 24),
       decoration: BoxDecoration(
-        color: scheme.surface,
+        color: scheme.surfaceContainerLow,
         border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
       ),
       child: Row(
@@ -200,6 +202,8 @@ class _TopBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
+          AppearanceButton(key: const Key('topbar-appearance')),
+          const SizedBox(width: 8),
           PopupMenuButton<_AccountAction>(
             tooltip: '账户菜单',
             onSelected: onAction,
@@ -225,8 +229,8 @@ class _TopBar extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               decoration: BoxDecoration(
-                color: scheme.surfaceContainerHighest.withValues(alpha: 0.65),
-                borderRadius: BorderRadius.circular(10),
+                color: scheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(99),
               ),
               child: Row(
                 children: [

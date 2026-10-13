@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/repositories.dart';
+import '../domain/appearance.dart';
 import '../domain/models.dart';
 
 const _noChange = Object();
@@ -16,12 +17,17 @@ final catalogRepositoryProvider = Provider<CatalogRepository>((ref) {
   throw UnimplementedError('CatalogRepository 必须在 ProviderScope 中覆盖');
 });
 
+final appearanceRepositoryProvider = Provider<AppearanceRepository>((ref) {
+  throw UnimplementedError('AppearanceRepository 必须在 ProviderScope 中覆盖');
+});
+
 class AppState {
   const AppState({
     this.initialized = false,
     this.busy = false,
     this.session,
     this.catalog,
+    this.appearance = const AppearanceSettings(),
     this.notice,
     this.error,
   });
@@ -30,6 +36,7 @@ class AppState {
   final bool busy;
   final MerchantSession? session;
   final CatalogSnapshot? catalog;
+  final AppearanceSettings appearance;
   final String? notice;
   final String? error;
 
@@ -38,6 +45,7 @@ class AppState {
     bool? busy,
     Object? session = _noChange,
     Object? catalog = _noChange,
+    AppearanceSettings? appearance,
     Object? notice = _noChange,
     Object? error = _noChange,
   }) {
@@ -50,6 +58,7 @@ class AppState {
       catalog: identical(catalog, _noChange)
           ? this.catalog
           : catalog as CatalogSnapshot?,
+      appearance: appearance ?? this.appearance,
       notice: identical(notice, _noChange) ? this.notice : notice as String?,
       error: identical(error, _noChange) ? this.error : error as String?,
     );
@@ -65,6 +74,8 @@ class AppController extends Notifier<AppState> {
 
   AuthRepository get _auth => ref.read(authRepositoryProvider);
   CatalogRepository get _catalog => ref.read(catalogRepositoryProvider);
+  AppearanceRepository get _appearance =>
+      ref.read(appearanceRepositoryProvider);
 
   @override
   AppState build() {
@@ -81,14 +92,17 @@ class AppController extends Notifier<AppState> {
     try {
       final sessionResult = await _auth.restoreSession();
       final catalogResult = await _catalog.loadCatalog();
+      final appearanceResult = await _appearance.loadAppearance();
       final notices = [
         sessionResult.recoveryNotice,
         catalogResult.recoveryNotice,
+        appearanceResult.recoveryNotice,
       ].whereType<String>().join('\n');
       state = AppState(
         initialized: true,
         session: sessionResult.value,
         catalog: catalogResult.value,
+        appearance: appearanceResult.value,
         notice: notices.isEmpty ? null : notices,
       );
     } catch (error) {
@@ -217,6 +231,24 @@ class AppController extends Notifier<AppState> {
       return true;
     } catch (error) {
       state = state.copyWith(busy: false, error: _message(error));
+      return false;
+    }
+  }
+
+  Future<bool> setAppearance(AppearanceSettings appearance) async {
+    if (appearance == state.appearance) {
+      return true;
+    }
+    final previous = state.appearance;
+    state = state.copyWith(appearance: appearance, error: null);
+    try {
+      await _appearance.saveAppearance(appearance);
+      return true;
+    } catch (error) {
+      state = state.copyWith(
+        appearance: previous,
+        error: '无法保存外观设置：${_message(error)}',
+      );
       return false;
     }
   }

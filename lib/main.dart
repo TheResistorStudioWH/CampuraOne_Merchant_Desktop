@@ -17,12 +17,16 @@ Future<void> main() async {
     supportDirectory: supportDirectory,
     seedLoader: () => rootBundle.loadString('assets/demo/catalog_seed.json'),
   );
+  final appearanceRepository = LocalAppearanceRepository(
+    supportDirectory: supportDirectory,
+  );
 
   runApp(
     ProviderScope(
       overrides: [
         authRepositoryProvider.overrideWithValue(authRepository),
         catalogRepositoryProvider.overrideWithValue(catalogRepository),
+        appearanceRepositoryProvider.overrideWithValue(appearanceRepository),
       ],
       child: const MerchantApp(),
     ),

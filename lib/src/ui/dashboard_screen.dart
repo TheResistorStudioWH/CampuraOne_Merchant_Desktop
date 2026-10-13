@@ -38,77 +38,55 @@ class DashboardScreen extends ConsumerWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final scheme = Theme.of(context).colorScheme;
         final twoColumns = constraints.maxWidth >= 880;
         return SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '经营概览',
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          '用可验证的本地商品数据快速了解当前目录。',
-                          style: TextStyle(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  FilledButton.icon(
-                    key: const Key('dashboard-add-product'),
-                    onPressed: () => context.go('/products/new'),
-                    icon: const Icon(Icons.add_rounded),
-                    label: const Text('新增商品'),
-                  ),
-                ],
+              _DashboardHero(
+                productCount: products.length,
+                onAdd: () => context.go('/products/new'),
               ),
-              const SizedBox(height: 24),
-              GridView.count(
+              const SizedBox(height: 20),
+              GridView(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: constraints.maxWidth >= 960 ? 4 : 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: constraints.maxWidth >= 960 ? 1.8 : 2.15,
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 310,
+                  mainAxisExtent: 126,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
                 children: [
                   _MetricCard(
                     label: '商品总数',
                     value: '${products.length}',
                     icon: Icons.inventory_2_rounded,
-                    color: brandPurple,
+                    containerColor: scheme.primaryContainer,
+                    onContainerColor: scheme.onPrimaryContainer,
                   ),
                   _MetricCard(
                     label: '主商户直营',
                     value: '$directCount',
                     icon: Icons.store_rounded,
-                    color: brandBlue,
+                    containerColor: scheme.secondaryContainer,
+                    onContainerColor: scheme.onSecondaryContainer,
                   ),
                   _MetricCard(
                     label: '附属商户商品',
                     value: '$subShopCount',
                     icon: Icons.account_tree_rounded,
-                    color: const Color(0xFFF18F32),
+                    containerColor: scheme.tertiaryContainer,
+                    onContainerColor: scheme.onTertiaryContainer,
                   ),
                   _MetricCard(
                     label: '已使用分类',
                     value: '$usedCategories',
                     icon: Icons.category_rounded,
-                    color: const Color(0xFF4B9B65),
+                    containerColor: scheme.surfaceContainerHighest,
+                    onContainerColor: scheme.onSurface,
                   ),
                 ],
               ),
@@ -150,18 +128,82 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
+class _DashboardHero extends StatelessWidget {
+  const _DashboardHero({required this.productCount, required this.onAdd});
+
+  final int productCount;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      color: scheme.primaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 22, 22, 22),
+        child: Row(
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                color: scheme.primary,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.storefront_rounded,
+                color: scheme.onPrimary,
+                size: 28,
+              ),
+            ),
+            const SizedBox(width: 18),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '经营概览',
+                    style: Theme.of(context).textTheme.headlineSmall
+                        ?.copyWith(color: scheme.onPrimaryContainer),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    '当前目录共有 $productCount 件商品，快速查看分布或继续补充商品。',
+                    style: TextStyle(
+                      color: scheme.onPrimaryContainer.withValues(alpha: 0.82),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 18),
+            FilledButton.icon(
+              key: const Key('dashboard-add-product'),
+              onPressed: onAdd,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('新增商品'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _MetricCard extends StatelessWidget {
   const _MetricCard({
     required this.label,
     required this.value,
     required this.icon,
-    required this.color,
+    required this.containerColor,
+    required this.onContainerColor,
   });
 
   final String label;
   final String value;
   final IconData icon;
-  final Color color;
+  final Color containerColor;
+  final Color onContainerColor;
 
   @override
   Widget build(BuildContext context) {
@@ -175,10 +217,10 @@ class _MetricCard extends StatelessWidget {
               width: 46,
               height: 46,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.13),
-                borderRadius: BorderRadius.circular(12),
+                color: containerColor,
+                borderRadius: BorderRadius.circular(16),
               ),
-              child: Icon(icon, color: color),
+              child: Icon(icon, color: onContainerColor),
             ),
             const SizedBox(width: 15),
             Expanded(

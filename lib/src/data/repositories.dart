@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../domain/appearance.dart';
 import '../domain/models.dart';
 
 const demoMerchantUserName = 'demo_merchant';
@@ -60,6 +61,12 @@ abstract interface class CatalogRepository {
   Future<CatalogSnapshot> resetDemoData();
 
   void dispose();
+}
+
+abstract interface class AppearanceRepository {
+  Future<RepositoryLoad<AppearanceSettings>> loadAppearance();
+
+  Future<void> saveAppearance(AppearanceSettings settings);
 }
 
 typedef AtomicCommitHook = FutureOr<void> Function(
@@ -182,6 +189,48 @@ class LocalAuthRepository implements AuthRepository {
     if (await _sessionFile.exists()) {
       await _sessionFile.delete();
     }
+  }
+}
+
+class LocalAppearanceRepository implements AppearanceRepository {
+  LocalAppearanceRepository({
+    required Directory supportDirectory,
+    this.writer = const AtomicJsonWriter(),
+  }) : _appearanceFile = File(
+         '${supportDirectory.path}${Platform.pathSeparator}appearance_v1.json',
+       );
+
+  final File _appearanceFile;
+  final AtomicJsonWriter writer;
+
+  File get appearanceFile => _appearanceFile;
+
+  @override
+  Future<RepositoryLoad<AppearanceSettings>> loadAppearance() async {
+    if (!await _appearanceFile.exists()) {
+      return const RepositoryLoad(AppearanceSettings());
+    }
+    final source = await _appearanceFile.readAsString();
+    try {
+      final decoded = jsonDecode(source);
+      if (decoded is! Map) {
+        throw const FormatException('外观设置根节点必须是对象');
+      }
+      return RepositoryLoad(
+        AppearanceSettings.fromJson(Map<String, dynamic>.from(decoded)),
+      );
+    } catch (_) {
+      final preserved = await _quarantine(_appearanceFile);
+      return RepositoryLoad(
+        const AppearanceSettings(),
+        recoveryNotice: '外观设置已恢复默认值；已保留副本 ${preserved.uri.pathSegments.last}。',
+      );
+    }
+  }
+
+  @override
+  Future<void> saveAppearance(AppearanceSettings settings) {
+    return writer.write(_appearanceFile, settings.toJson());
   }
 }
 

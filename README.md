@@ -7,6 +7,8 @@
 - 已审批商家的本地演示登录和会话恢复，持久化文件不保存密码。
 - 总览：商品数量、直营/附属归属、分类分布、最近更新。
 - 商品：搜索、分类/归属筛选、排序、详情和本地新增/编辑/删除。
+- 基于 Google Material 3 的桌面组件体系：状态容器、Filter Chip、Menu、tonal 按钮、响应式卡片与完整焦点/悬停反馈。
+- 内置暖橙、蜂蜜黄、日落橙黄、湖青和鲜绿 5 套主题，可跟随系统或手动选择浅色/深色。
 - 1280×800 宽屏使用列表+右侧详情，窄窗口自动切换为独立详情页。
 - 首次启动从只读 seed 初始化数据；原子写入失败会回滚，损坏文件会保留时间戳副本并恢复 seed。
 
@@ -60,4 +62,4 @@ flutter build windows
 - `assets/demo/`：只读目录 seed 和四张内置演示图。
 - `test/`：领域映射、持久化与 Widget 流程测试。
 
-应用支持目录中会生成 `session_v1.json` 和 `catalog_v1.json`。未来接入后端时，保留当前领域模型和 `{code,message,data}` 响应合同，替换 Repository 实现即可。
+应用支持目录中会生成 `session_v1.json`、`catalog_v1.json` 和 `appearance_v1.json`。未来接入后端时，保留当前领域模型和 `{code,message,data}` 响应合同，替换 Repository 实现即可。

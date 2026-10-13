@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'app_theme.dart';
-
 class BrandMark extends StatelessWidget {
   const BrandMark({super.key, this.compact = false});
 
@@ -9,14 +7,15 @@ class BrandMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final mark = Container(
       width: compact ? 36 : 44,
       height: compact ? 36 : 44,
       decoration: BoxDecoration(
-        color: brandPurple,
-        borderRadius: BorderRadius.circular(compact ? 10 : 12),
+        color: scheme.primary,
+        borderRadius: BorderRadius.circular(compact ? 12 : 15),
       ),
-      child: const Icon(Icons.storefront_rounded, color: Colors.white),
+      child: Icon(Icons.storefront_rounded, color: scheme.onPrimary),
     );
     if (compact) {
       return Tooltip(message: 'Campura One 商家端', child: mark);

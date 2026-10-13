@@ -82,12 +82,15 @@ class MerchantApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    final appearance = ref.watch(
+      appControllerProvider.select((state) => state.appearance),
+    );
     return MaterialApp.router(
       title: 'Campura One 商家端',
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.system,
-      theme: buildMerchantTheme(Brightness.light),
-      darkTheme: buildMerchantTheme(Brightness.dark),
+      themeMode: materialThemeMode(appearance.brightness),
+      theme: buildMerchantTheme(Brightness.light, appearance.preset),
+      darkTheme: buildMerchantTheme(Brightness.dark, appearance.preset),
       locale: const Locale('zh', 'CN'),
       supportedLocales: const [Locale('zh', 'CN')],
       localizationsDelegates: const [
@@ -119,12 +122,12 @@ class _LoadingScreen extends ConsumerWidget {
                   width: 64,
                   height: 64,
                   decoration: BoxDecoration(
-                    color: brandPurple,
-                    borderRadius: BorderRadius.circular(18),
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.storefront_rounded,
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
                     size: 34,
                   ),
                 ),

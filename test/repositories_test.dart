@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:campura_one_merchant/src/data/repositories.dart';
+import 'package:campura_one_merchant/src/domain/appearance.dart';
 import 'package:campura_one_merchant/src/domain/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -149,5 +150,43 @@ void main() {
     expect(reset.products, hasLength(4));
     expect((await auth.restoreSession()).value, isNotNull);
     catalog.dispose();
+  });
+
+  test('外观设置可持久化并在重启后恢复', () async {
+    final first = LocalAppearanceRepository(
+      supportDirectory: temporaryDirectory,
+    );
+    expect((await first.loadAppearance()).value, const AppearanceSettings());
+
+    const selected = AppearanceSettings(
+      preset: MerchantThemePreset.lagoon,
+      brightness: AppearanceBrightness.dark,
+    );
+    await first.saveAppearance(selected);
+
+    final restarted = LocalAppearanceRepository(
+      supportDirectory: temporaryDirectory,
+    );
+    expect((await restarted.loadAppearance()).value, selected);
+  });
+
+  test('损坏的外观设置会保留副本并回退默认值', () async {
+    final repository = LocalAppearanceRepository(
+      supportDirectory: temporaryDirectory,
+    );
+    await repository.saveAppearance(
+      const AppearanceSettings(preset: MerchantThemePreset.sunset),
+    );
+    await repository.appearanceFile.writeAsString('{broken json');
+
+    final recovered = await repository.loadAppearance();
+    expect(recovered.value, const AppearanceSettings());
+    expect(recovered.recoveryNotice, contains('已保留副本'));
+    expect(
+      temporaryDirectory.listSync().whereType<File>().where(
+        (file) => file.path.contains('appearance_v1.json.corrupt-'),
+      ),
+      hasLength(1),
+    );
   });
 }

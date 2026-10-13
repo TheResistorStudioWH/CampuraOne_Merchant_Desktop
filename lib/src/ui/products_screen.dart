@@ -387,184 +387,216 @@ class _ProductToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  key: const Key('product-search'),
-                  controller: searchController,
-                  focusNode: searchFocus,
-                  onChanged: onSearchChanged,
-                  decoration: InputDecoration(
-                    hintText: '搜索名称或介绍',
-                    prefixIcon: const Icon(Icons.search_rounded),
-                    suffixIcon: searchController.text.isEmpty
-                        ? null
-                        : IconButton(
-                            tooltip: '清空搜索',
-                            onPressed: () {
-                              searchController.clear();
-                              onSearchChanged('');
-                            },
-                            icon: const Icon(Icons.close_rounded),
-                          ),
+    final scheme = Theme.of(context).colorScheme;
+    final categoryLabel = categoryId == null
+        ? '全部分类'
+        : categories
+                  .where((category) => category.categoryId == categoryId)
+                  .map((category) => category.categoryName)
+                  .firstOrNull ??
+              '全部分类';
+    final ownershipLabel = switch (ownership) {
+      ProductOwnership.all => '全部归属',
+      ProductOwnership.direct => '主商户直营',
+      ProductOwnership.subShop => '附属商户',
+    };
+    final sortLabel = switch (sort) {
+      ProductSort.updatedDesc => '最近更新',
+      ProductSort.updatedAsc => '最早更新',
+      ProductSort.nameAsc => '名称升序',
+      ProductSort.priceAsc => '价格从低到高',
+      ProductSort.priceDesc => '价格从高到低',
+    };
+
+    return Material(
+      color: scheme.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    key: const Key('product-search'),
+                    controller: searchController,
+                    focusNode: searchFocus,
+                    onChanged: onSearchChanged,
+                    decoration: InputDecoration(
+                      hintText: '搜索商品名称或介绍',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: searchController.text.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.only(right: 14),
+                              child: Center(
+                                widthFactor: 1,
+                                child: Text('Ctrl / Cmd + F'),
+                              ),
+                            )
+                          : IconButton(
+                              tooltip: '清空搜索',
+                              onPressed: () {
+                                searchController.clear();
+                                onSearchChanged('');
+                              },
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              FilledButton.icon(
-                key: const Key('product-add'),
-                onPressed: onAdd,
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('新增商品'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    _FilterDropdown<int?>(
-                      value: categoryId,
-                      tooltip: '分类',
-                      icon: Icons.category_outlined,
-                      items: [
-                        const DropdownMenuItem<int?>(
-                          value: null,
-                          child: Text('全部分类'),
-                        ),
-                        for (final category in categories)
-                          DropdownMenuItem<int?>(
-                            value: category.categoryId,
-                            child: Text(category.categoryName),
-                          ),
-                      ],
-                      onChanged: onCategoryChanged,
-                    ),
-                    _FilterDropdown<ProductOwnership>(
-                      value: ownership,
-                      tooltip: '商户归属',
-                      icon: Icons.store_outlined,
-                      items: const [
-                        DropdownMenuItem(
-                          value: ProductOwnership.all,
-                          child: Text('全部归属'),
-                        ),
-                        DropdownMenuItem(
-                          value: ProductOwnership.direct,
-                          child: Text('主商户直营'),
-                        ),
-                        DropdownMenuItem(
-                          value: ProductOwnership.subShop,
-                          child: Text('附属商户'),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          onOwnershipChanged(value);
-                        }
-                      },
-                    ),
-                    _FilterDropdown<ProductSort>(
-                      value: sort,
-                      tooltip: '排序',
-                      icon: Icons.sort_rounded,
-                      items: const [
-                        DropdownMenuItem(
-                          value: ProductSort.updatedDesc,
-                          child: Text('最近更新'),
-                        ),
-                        DropdownMenuItem(
-                          value: ProductSort.updatedAsc,
-                          child: Text('最早更新'),
-                        ),
-                        DropdownMenuItem(
-                          value: ProductSort.nameAsc,
-                          child: Text('名称升序'),
-                        ),
-                        DropdownMenuItem(
-                          value: ProductSort.priceAsc,
-                          child: Text('价格从低到高'),
-                        ),
-                        DropdownMenuItem(
-                          value: ProductSort.priceDesc,
-                          child: Text('价格从高到低'),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          onSortChanged(value);
-                        }
-                      },
-                    ),
-                  ],
+                const SizedBox(width: 12),
+                FilledButton.icon(
+                  key: const Key('product-add'),
+                  onPressed: onAdd,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('新增商品'),
                 ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _FilterMenu<int?>(
+                    value: categoryId,
+                    label: categoryLabel,
+                    tooltip: '按分类筛选',
+                    icon: Icons.category_outlined,
+                    active: categoryId != null,
+                    options: [
+                      const _FilterOption(value: null, label: '全部分类'),
+                      for (final category in categories)
+                        _FilterOption(
+                          value: category.categoryId,
+                          label: category.categoryName,
+                        ),
+                    ],
+                    onChanged: onCategoryChanged,
+                  ),
+                  _FilterMenu<ProductOwnership>(
+                    value: ownership,
+                    label: ownershipLabel,
+                    tooltip: '按商户归属筛选',
+                    icon: Icons.store_outlined,
+                    active: ownership != ProductOwnership.all,
+                    options: const [
+                      _FilterOption(value: ProductOwnership.all, label: '全部归属'),
+                      _FilterOption(
+                        value: ProductOwnership.direct,
+                        label: '主商户直营',
+                      ),
+                      _FilterOption(
+                        value: ProductOwnership.subShop,
+                        label: '附属商户',
+                      ),
+                    ],
+                    onChanged: onOwnershipChanged,
+                  ),
+                  _FilterMenu<ProductSort>(
+                    value: sort,
+                    label: sortLabel,
+                    tooltip: '更改排序',
+                    icon: Icons.swap_vert_rounded,
+                    active: sort != ProductSort.updatedDesc,
+                    options: const [
+                      _FilterOption(
+                        value: ProductSort.updatedDesc,
+                        label: '最近更新',
+                      ),
+                      _FilterOption(
+                        value: ProductSort.updatedAsc,
+                        label: '最早更新',
+                      ),
+                      _FilterOption(value: ProductSort.nameAsc, label: '名称升序'),
+                      _FilterOption(
+                        value: ProductSort.priceAsc,
+                        label: '价格从低到高',
+                      ),
+                      _FilterOption(
+                        value: ProductSort.priceDesc,
+                        label: '价格从高到低',
+                      ),
+                    ],
+                    onChanged: onSortChanged,
+                  ),
+                  Chip(
+                    avatar: const Icon(Icons.inventory_2_outlined, size: 18),
+                    label: Text('$resultCount 件'),
+                    side: BorderSide.none,
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Text(
-                '$resultCount 件商品',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _FilterDropdown<T> extends StatelessWidget {
-  const _FilterDropdown({
+class _FilterOption<T> {
+  const _FilterOption({required this.value, required this.label});
+
+  final T value;
+  final String label;
+}
+
+class _FilterMenu<T> extends StatelessWidget {
+  const _FilterMenu({
     required this.value,
+    required this.label,
     required this.tooltip,
     required this.icon,
-    required this.items,
+    required this.active,
+    required this.options,
     required this.onChanged,
   });
 
   final T value;
+  final String label;
   final String tooltip;
   final IconData icon;
-  final List<DropdownMenuItem<T>> items;
-  final ValueChanged<T?> onChanged;
+  final bool active;
+  final List<_FilterOption<T>> options;
+  final ValueChanged<T> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Tooltip(
-      message: tooltip,
-      child: Container(
-        height: 40,
-        padding: const EdgeInsets.only(left: 10, right: 4),
-        decoration: BoxDecoration(
-          color: scheme.surface,
-          borderRadius: BorderRadius.circular(9),
-          border: Border.all(color: scheme.outlineVariant),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 18, color: scheme.onSurfaceVariant),
-            const SizedBox(width: 7),
-            DropdownButtonHideUnderline(
-              child: DropdownButton<T>(
-                value: value,
-                borderRadius: BorderRadius.circular(10),
-                items: items,
-                onChanged: onChanged,
-              ),
+    return MenuAnchor(
+      menuChildren: [
+        for (final option in options)
+          MenuItemButton(
+            onPressed: () => onChanged(option.value),
+            leadingIcon: Icon(
+              option.value == value
+                  ? Icons.check_rounded
+                  : Icons.circle_outlined,
+              size: 18,
             ),
-          ],
+            child: Text(option.label),
+          ),
+      ],
+      builder: (context, controller, child) => Tooltip(
+        message: tooltip,
+        child: FilterChip(
+          selected: active,
+          showCheckmark: false,
+          avatar: Icon(icon, size: 18),
+          label: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label),
+              const SizedBox(width: 4),
+              const Icon(Icons.arrow_drop_down_rounded, size: 20),
+            ],
+          ),
+          onSelected: (_) {
+            controller.isOpen ? controller.close() : controller.open();
+          },
         ),
       ),
     );
@@ -598,9 +630,9 @@ class _ProductList extends StatelessWidget {
     }
     return ListView.separated(
       key: const Key('product-list'),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       itemCount: products.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 6),
+      separatorBuilder: (context, index) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final product = products[index];
         return _ProductListTile(
@@ -633,22 +665,29 @@ class _ProductListTile extends StatelessWidget {
     final category = catalog.categoryById(product.categoryId);
     final subShop = catalog.subShopById(product.subShopId);
     return Material(
-      color: selected ? scheme.primaryContainer.withValues(alpha: 0.72) : null,
-      borderRadius: BorderRadius.circular(11),
+      color: selected ? scheme.secondaryContainer : scheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(
+          color: selected ? scheme.secondary : scheme.outlineVariant,
+          width: selected ? 1.5 : 1,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         key: Key('product-item-${product.productId}'),
         onTap: onTap,
-        borderRadius: BorderRadius.circular(11),
+        borderRadius: BorderRadius.circular(18),
         hoverColor: scheme.primary.withValues(alpha: 0.06),
         child: Padding(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(12),
           child: Row(
             children: [
               SizedBox.square(
-                dimension: 60,
+                dimension: 64,
                 child: ProductImage(
                   assetPath: product.productImg,
-                  borderRadius: 9,
+                  borderRadius: 14,
                 ),
               ),
               const SizedBox(width: 12),
@@ -669,7 +708,12 @@ class _ProductListTile extends StatelessWidget {
                         const SizedBox(width: 8),
                         Text(
                           '¥${product.priceAsDecimal}',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            color: selected
+                                ? scheme.onSecondaryContainer
+                                : scheme.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ],
                     ),
@@ -686,9 +730,11 @@ class _ProductListTile extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Icon(
-                Icons.chevron_right_rounded,
+                selected
+                    ? Icons.check_circle_rounded
+                    : Icons.chevron_right_rounded,
                 size: 20,
-                color: scheme.onSurfaceVariant,
+                color: selected ? scheme.secondary : scheme.onSurfaceVariant,
               ),
             ],
           ),
@@ -733,10 +779,10 @@ class ProductDetailsPane extends StatelessWidget {
     return Column(
       children: [
         Container(
-          height: 64,
-          padding: const EdgeInsets.symmetric(horizontal: 18),
+          height: 72,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
-            color: scheme.surface,
+            color: scheme.surfaceContainerLow,
             border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
           ),
           child: Row(
@@ -756,14 +802,17 @@ class ProductDetailsPane extends StatelessWidget {
                       ?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ),
-              IconButton(
+              IconButton.filledTonal(
                 tooltip: '删除商品',
                 onPressed: onDelete,
-                color: scheme.error,
+                style: IconButton.styleFrom(
+                  backgroundColor: scheme.errorContainer,
+                  foregroundColor: scheme.onErrorContainer,
+                ),
                 icon: const Icon(Icons.delete_outline_rounded),
               ),
-              const SizedBox(width: 6),
-              FilledButton.icon(
+              const SizedBox(width: 10),
+              FilledButton.tonalIcon(
                 key: const Key('product-edit'),
                 onPressed: onEdit,
                 icon: const Icon(Icons.edit_outlined),
@@ -781,9 +830,12 @@ class ProductDetailsPane extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    AspectRatio(
-                      aspectRatio: 2.2,
-                      child: ProductImage(assetPath: value.productImg),
+                    Card(
+                      clipBehavior: Clip.antiAlias,
+                      child: AspectRatio(
+                        aspectRatio: 2.2,
+                        child: ProductImage(assetPath: value.productImg),
+                      ),
                     ),
                     const SizedBox(height: 24),
                     Row(
@@ -829,39 +881,73 @@ class ProductDetailsPane extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 30),
-                    Text(
-                      '商品介绍',
-                      style: Theme.of(context).textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      value.productIntro?.trim().isNotEmpty == true
-                          ? value.productIntro!
-                          : '暂无介绍',
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        height: 1.6,
-                        color: value.productIntro?.trim().isNotEmpty == true
-                            ? scheme.onSurface
-                            : scheme.onSurfaceVariant,
+                    const SizedBox(height: 24),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.notes_rounded,
+                                  color: scheme.primary,
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  '商品介绍',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              value.productIntro?.trim().isNotEmpty == true
+                                  ? value.productIntro!
+                                  : '暂无介绍',
+                              style: Theme.of(context).textTheme.bodyLarge
+                                  ?.copyWith(
+                                    height: 1.6,
+                                    color:
+                                        value.productIntro?.trim().isNotEmpty ==
+                                            true
+                                        ? scheme.onSurface
+                                        : scheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 30),
-                    const Divider(),
-                    const SizedBox(height: 14),
-                    _DetailRow(label: '主商户', value: mainShop?.shopName ?? '未知'),
-                    _DetailRow(
-                      label: '商品 ID',
-                      value: value.productId.toString(),
-                    ),
-                    _DetailRow(
-                      label: '创建时间',
-                      value: dateFormat.format(value.createdAt),
-                    ),
-                    _DetailRow(
-                      label: '更新时间',
-                      value: dateFormat.format(value.updatedAt),
+                    const SizedBox(height: 16),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          children: [
+                            _DetailRow(
+                              label: '主商户',
+                              value: mainShop?.shopName ?? '未知',
+                            ),
+                            _DetailRow(
+                              label: '商品 ID',
+                              value: value.productId.toString(),
+                            ),
+                            _DetailRow(
+                              label: '创建时间',
+                              value: dateFormat.format(value.createdAt),
+                            ),
+                            _DetailRow(
+                              label: '更新时间',
+                              value: dateFormat.format(value.updatedAt),
+                              last: true,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -887,49 +973,51 @@ class _MetadataChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.11),
-        borderRadius: BorderRadius.circular(99),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 17, color: color),
-          const SizedBox(width: 7),
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-        ],
-      ),
+    return Chip(
+      avatar: Icon(icon, size: 18, color: color),
+      label: Text(label),
+      backgroundColor: color.withValues(alpha: 0.12),
+      side: BorderSide.none,
+      shape: const StadiumBorder(),
     );
   }
 }
 
 class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.label, required this.value});
+  const _DetailRow({
+    required this.label,
+    required this.value,
+    this.last = false,
+  });
 
   final String label;
   final String value;
+  final bool last;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 86,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 86,
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ),
-            ),
+              Expanded(child: SelectableText(value)),
+            ],
           ),
-          Expanded(child: SelectableText(value)),
-        ],
-      ),
+        ),
+        if (!last) const Divider(height: 1),
+      ],
     );
   }
 }

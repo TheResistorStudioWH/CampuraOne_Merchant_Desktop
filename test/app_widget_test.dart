@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:campura_one_merchant/src/app.dart';
 import 'package:campura_one_merchant/src/data/repositories.dart';
+import 'package:campura_one_merchant/src/domain/appearance.dart';
 import 'package:campura_one_merchant/src/domain/models.dart';
 import 'package:campura_one_merchant/src/state/app_state.dart';
 import 'package:flutter/material.dart';
@@ -28,6 +29,7 @@ void main() {
   Future<void> pumpMerchantApp(
     WidgetTester tester, {
     Size size = const Size(1280, 800),
+    _MemoryAppearanceRepository? appearance,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = size;
@@ -39,11 +41,13 @@ void main() {
     );
     final auth = _MemoryAuthRepository();
     final catalog = _MemoryCatalogRepository(seed);
+    final appearanceRepository = appearance ?? _MemoryAppearanceRepository();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           authRepositoryProvider.overrideWithValue(auth),
           catalogRepositoryProvider.overrideWithValue(catalog),
+          appearanceRepositoryProvider.overrideWithValue(appearanceRepository),
         ],
         child: const MerchantApp(),
       ),
@@ -71,6 +75,32 @@ void main() {
     expect(find.text('经营概览'), findsOneWidget);
     expect(find.text('商品总数'), findsOneWidget);
     expect(find.text('4'), findsOneWidget);
+  });
+
+  testWidgets('外观面板可切换 Material 3 主题和深浅模式', (tester) async {
+    final appearance = _MemoryAppearanceRepository();
+    await pumpMerchantApp(tester, appearance: appearance);
+    final initialTheme = Theme.of(tester.element(find.text('欢迎回来')));
+
+    await tester.tap(find.byKey(const Key('appearance-open')));
+    await pumpUntilFound(tester, find.text('外观与主题'));
+    await tester.tap(find.byKey(const Key('appearance-preset-lagoon')));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(appearance.settings.preset, MerchantThemePreset.lagoon);
+    final lagoonTheme = Theme.of(tester.element(find.text('外观与主题')));
+    expect(
+      lagoonTheme.colorScheme.primary,
+      isNot(initialTheme.colorScheme.primary),
+    );
+
+    await tester.tap(find.text('深色'));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(appearance.settings.brightness, AppearanceBrightness.dark);
+    expect(
+      Theme.of(tester.element(find.text('外观与主题'))).brightness,
+      Brightness.dark,
+    );
   });
 
   testWidgets('搜索、新增、编辑与删除商品', (tester) async {
@@ -171,6 +201,20 @@ class _MemoryAuthRepository implements AuthRepository {
   @override
   Future<void> logout() async {
     _session = null;
+  }
+}
+
+class _MemoryAppearanceRepository implements AppearanceRepository {
+  AppearanceSettings settings = const AppearanceSettings();
+
+  @override
+  Future<RepositoryLoad<AppearanceSettings>> loadAppearance() async {
+    return RepositoryLoad(settings);
+  }
+
+  @override
+  Future<void> saveAppearance(AppearanceSettings settings) async {
+    this.settings = settings;
   }
 }
 

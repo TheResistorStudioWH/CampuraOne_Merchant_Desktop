@@ -175,17 +175,17 @@ class ProductEditorState extends ConsumerState<ProductEditor> {
           child: Column(
             children: [
               Container(
-                height: 64,
+                height: 72,
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 decoration: BoxDecoration(
-                  color: scheme.surface,
+                  color: scheme.surfaceContainerLow,
                   border: Border(
                     bottom: BorderSide(color: scheme.outlineVariant),
                   ),
                 ),
                 child: Row(
                   children: [
-                    IconButton(
+                    IconButton.filledTonal(
                       tooltip: '取消 (Esc)',
                       onPressed: _saving ? null : cancel,
                       icon: const Icon(Icons.close_rounded),
@@ -198,14 +198,15 @@ class ProductEditorState extends ConsumerState<ProductEditor> {
                             ?.copyWith(fontWeight: FontWeight.w700),
                       ),
                     ),
-                    if (_dirty)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 12),
-                        child: Text(
-                          '未保存',
-                          style: TextStyle(color: scheme.primary),
-                        ),
+                    if (_dirty) ...[
+                      Chip(
+                        avatar: const Icon(Icons.edit_note_rounded, size: 18),
+                        label: const Text('未保存'),
+                        backgroundColor: scheme.tertiaryContainer,
+                        side: BorderSide.none,
                       ),
+                      const SizedBox(width: 12),
+                    ],
                     FilledButton.icon(
                       key: const Key('product-save'),
                       onPressed: _saving ? null : save,
@@ -230,6 +231,7 @@ class ProductEditorState extends ConsumerState<ProductEditor> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           const _SectionHeading(
+                            icon: Icons.edit_note_rounded,
                             title: '基本信息',
                             subtitle: '商品名称和价格是必填项。',
                           ),
@@ -271,6 +273,7 @@ class ProductEditorState extends ConsumerState<ProductEditor> {
                           ),
                           const SizedBox(height: 28),
                           const _SectionHeading(
+                            icon: Icons.storefront_rounded,
                             title: '归属与分类',
                             subtitle: '直营商品不关联附属商户。',
                           ),
@@ -363,6 +366,7 @@ class ProductEditorState extends ConsumerState<ProductEditor> {
                           ),
                           const SizedBox(height: 28),
                           const _SectionHeading(
+                            icon: Icons.image_outlined,
                             title: '图片与介绍',
                             subtitle: '首版可选用内置演示素材，也可留空。',
                           ),
@@ -437,26 +441,40 @@ class ProductEditorState extends ConsumerState<ProductEditor> {
 }
 
 class _SectionHeading extends StatelessWidget {
-  const _SectionHeading({required this.title, required this.subtitle});
+  const _SectionHeading({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
 
+  final IconData icon;
   final String title;
   final String subtitle;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium
-              ?.copyWith(fontWeight: FontWeight.w700),
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: scheme.primaryContainer,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: scheme.onPrimaryContainer, size: 21),
         ),
-        const SizedBox(height: 4),
-        Text(
-          subtitle,
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 3),
+              Text(subtitle, style: TextStyle(color: scheme.onSurfaceVariant)),
+            ],
           ),
         ),
       ],
