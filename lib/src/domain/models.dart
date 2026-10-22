@@ -502,7 +502,7 @@ class ProductDraft {
         (shop) => shop.shopId == subShopId,
       );
       if (matches.isEmpty || matches.first.mainShopId != mainShopId) {
-        errors['subShopID'] = '附属商户必须属于当前主商户';
+        errors['subShopID'] = '子商户必须属于当前主商户';
       }
     }
     return errors;
@@ -680,12 +680,16 @@ class ProductQuery {
   const ProductQuery({
     this.search = '',
     this.categoryId,
+    this.mainShopId,
+    this.subShopId,
     this.ownership = ProductOwnership.all,
     this.sort = ProductSort.updatedDesc,
   });
 
   final String search;
   final int? categoryId;
+  final int? mainShopId;
+  final int? subShopId;
   final ProductOwnership ownership;
   final ProductSort sort;
 
@@ -694,6 +698,12 @@ class ProductQuery {
     final result = source
         .where((product) {
           if (categoryId != null && product.categoryId != categoryId) {
+            return false;
+          }
+          if (mainShopId != null && product.mainShopId != mainShopId) {
+            return false;
+          }
+          if (subShopId != null && product.subShopId != subShopId) {
             return false;
           }
           if (ownership == ProductOwnership.direct &&

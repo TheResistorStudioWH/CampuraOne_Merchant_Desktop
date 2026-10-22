@@ -34,6 +34,10 @@ void main() {
     final first = repository();
     final initial = await first.loadCatalog();
     expect(initial.value.products, hasLength(4));
+    expect(
+      initial.value.subShops.single.accountId,
+      isNot(initial.value.mainShops.single.accountId),
+    );
     expect(await first.catalogFile.exists(), isTrue);
 
     final created = await first.createProduct(
@@ -161,6 +165,9 @@ void main() {
     const selected = AppearanceSettings(
       preset: MerchantThemePreset.lagoon,
       brightness: AppearanceBrightness.dark,
+      sidebarWidth: 304,
+      productListWidth: 500,
+      promotionListWidth: 360,
     );
     await first.saveAppearance(selected);
 
@@ -168,6 +175,33 @@ void main() {
       supportDirectory: temporaryDirectory,
     );
     expect((await restarted.loadAppearance()).value, selected);
+  });
+
+  test('旧外观设置与无效侧栏宽度仍可读取', () {
+    expect(
+      AppearanceSettings.fromJson(const {
+        'themePreset': 'freshGreen',
+        'brightness': 'light',
+      }).sidebarWidth,
+      isNull,
+    );
+    expect(
+      AppearanceSettings.fromJson(const {'sidebarWidth': 'too wide'})
+          .sidebarWidth,
+      isNull,
+    );
+    expect(
+      const AppearanceSettings(sidebarWidth: 280)
+          .copyWith(sidebarWidth: null)
+          .sidebarWidth,
+      isNull,
+    );
+    expect(
+      const AppearanceSettings(productListWidth: 400)
+          .copyWith(productListWidth: null)
+          .productListWidth,
+      isNull,
+    );
   });
 
   test('损坏的外观设置会保留副本并回退默认值', () async {

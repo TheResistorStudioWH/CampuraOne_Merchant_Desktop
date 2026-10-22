@@ -1,6 +1,9 @@
 {
   "dart.lineLength": 100,
   "editor.formatOnSave": true,
-  "editor.rulers": [100],
-  "files.insertFinalNewline": true
+  "editor.rulers": [
+    100
+  ],
+  "files.insertFinalNewline": true,
+  "cmake.sourceDirectory": "/Users/LShayc1owN/Desktop/Develop/个人项目/学校/26大一期末小组作业/Campura One/桌面端-商家端/CampuraOne_Merchant/windows"
 }

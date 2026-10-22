@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../domain/appearance.dart';
+import '../domain/marketing_models.dart';
 import '../domain/models.dart';
 
 const demoMerchantUserName = 'demo_merchant';
@@ -26,6 +27,15 @@ class AuthenticationException implements Exception {
 
 class CatalogValidationException implements Exception {
   const CatalogValidationException(this.errors);
+
+  final Map<String, String> errors;
+
+  @override
+  String toString() => errors.values.join('；');
+}
+
+class MarketingValidationException implements Exception {
+  const MarketingValidationException(this.errors);
 
   final Map<String, String> errors;
 
@@ -67,6 +77,31 @@ abstract interface class AppearanceRepository {
   Future<RepositoryLoad<AppearanceSettings>> loadAppearance();
 
   Future<void> saveAppearance(AppearanceSettings settings);
+}
+
+abstract interface class MarketingRepository {
+  Future<RepositoryLoad<MarketingSnapshot>> loadMarketing();
+
+  Future<PromotionEvent> createPromotion(
+    PromotionDraft draft,
+    CatalogSnapshot catalog,
+  );
+
+  Future<PromotionEvent> updatePromotion(
+    int saleId,
+    PromotionDraft draft,
+    CatalogSnapshot catalog,
+  );
+
+  Future<void> deletePromotion(int saleId);
+
+  Future<Advertisement> createAdvertisement(AdvertisementDraft draft);
+
+  Future<Advertisement> updateAdvertisement(int adId, AdvertisementDraft draft);
+
+  Future<void> deleteAdvertisement(int adId);
+
+  Future<MarketingSnapshot> resetDemoData();
 }
 
 typedef AtomicCommitHook = FutureOr<void> Function(
@@ -392,6 +427,202 @@ class LocalCatalogRepository implements CatalogRepository {
   @override
   void dispose() {
     _productsController.close();
+  }
+}
+
+class LocalMarketingRepository implements MarketingRepository {
+  LocalMarketingRepository({
+    required Directory supportDirectory,
+    this.writer = const AtomicJsonWriter(),
+  }) : _file = File(
+         '${supportDirectory.path}${Platform.pathSeparator}marketing_v1.json',
+       );
+
+  final File _file;
+  final AtomicJsonWriter writer;
+  MarketingSnapshot? _snapshot;
+
+  File get marketingFile => _file;
+
+  @override
+  Future<RepositoryLoad<MarketingSnapshot>> loadMarketing() async {
+    if (_snapshot != null) return RepositoryLoad(_snapshot!);
+    if (!await _file.exists()) {
+      const empty = MarketingSnapshot();
+      await writer.write(_file, empty.toJson());
+      _snapshot = empty;
+      return const RepositoryLoad(empty);
+    }
+    try {
+      final loaded = MarketingSnapshot.fromJsonString(
+        await _file.readAsString(),
+      );
+      _snapshot = loaded;
+      return RepositoryLoad(loaded);
+    } catch (_) {
+      final preserved = await _quarantine(_file);
+      const empty = MarketingSnapshot();
+      await writer.write(_file, empty.toJson());
+      _snapshot = empty;
+      return RepositoryLoad(
+        empty,
+        recoveryNotice:
+            '营销数据损坏，已保留副本（${preserved.uri.pathSegments.last}）并恢复空目录。',
+      );
+    }
+  }
+
+  Future<MarketingSnapshot> _current() async =>
+      _snapshot ?? (await loadMarketing()).value;
+
+  Future<void> _persist(MarketingSnapshot next) async {
+    await writer.write(_file, next.toJson());
+    _snapshot = next;
+  }
+
+  @override
+  Future<PromotionEvent> createPromotion(
+    PromotionDraft draft,
+    CatalogSnapshot catalog,
+  ) async {
+    final errors = draft.validationErrors(catalog);
+    if (errors.isNotEmpty) throw MarketingValidationException(errors);
+    final current = await _current();
+    final nextId =
+        current.promotions.fold<int>(
+          0,
+          (highest, item) => item.saleId > highest ? item.saleId : highest,
+        ) +
+        1;
+    final now = DateTime.now();
+    final created = draft.toEvent(nextId, now, now);
+    await _persist(
+      current.copyWith(promotions: [...current.promotions, created]),
+    );
+    return created;
+  }
+
+  @override
+  Future<PromotionEvent> updatePromotion(
+    int saleId,
+    PromotionDraft draft,
+    CatalogSnapshot catalog,
+  ) async {
+    final current = await _current();
+    final existing = current.promotionById(saleId);
+    if (existing == null) throw StateError('促销事件不存在');
+    final errors = draft.validationErrors(catalog);
+    if (errors.isNotEmpty) throw MarketingValidationException(errors);
+    final updated = draft.toEvent(saleId, existing.createdAt, DateTime.now());
+    final next = current.copyWith(
+      promotions: current.promotions
+          .map((item) => item.saleId == saleId ? updated : item)
+          .toList(growable: false),
+    );
+    for (final ad in current.adsFor(saleId)) {
+      final adErrors = AdvertisementDraft(
+        saleId: saleId,
+        startTime: ad.startTime,
+        endTime: ad.endTime,
+        type: ad.type,
+        img: ad.img,
+      ).validationErrors(next);
+      if (adErrors.isNotEmpty) {
+        throw const MarketingValidationException({
+          'period': '修改后的促销时段不能排除已有广告，请先调整广告时段',
+        });
+      }
+    }
+    await _persist(next);
+    return updated;
+  }
+
+  @override
+  Future<void> deletePromotion(int saleId) async {
+    final current = await _current();
+    if (current.promotionById(saleId) == null) throw StateError('促销事件不存在');
+    if (current.adsFor(saleId).isNotEmpty) {
+      throw const MarketingValidationException({'ads': '请先删除该促销下的广告'});
+    }
+    await _persist(
+      current.copyWith(
+        promotions: current.promotions
+            .where((item) => item.saleId != saleId)
+            .toList(),
+      ),
+    );
+  }
+
+  @override
+  Future<Advertisement> createAdvertisement(AdvertisementDraft draft) async {
+    final current = await _current();
+    final errors = draft.validationErrors(current);
+    if (errors.isNotEmpty) throw MarketingValidationException(errors);
+    final nextId =
+        current.advertisements.fold<int>(
+          0,
+          (highest, item) => item.adId > highest ? item.adId : highest,
+        ) +
+        1;
+    final now = DateTime.now();
+    final created = draft.toAdvertisement(nextId, now, now);
+    await _persist(
+      current.copyWith(advertisements: [...current.advertisements, created]),
+    );
+    return created;
+  }
+
+  @override
+  Future<Advertisement> updateAdvertisement(
+    int adId,
+    AdvertisementDraft draft,
+  ) async {
+    final current = await _current();
+    Advertisement? existing;
+    for (final item in current.advertisements) {
+      if (item.adId == adId) existing = item;
+    }
+    if (existing == null) throw StateError('广告不存在');
+    if (draft.saleId != existing.saleId) {
+      throw const MarketingValidationException({'saleID': '广告不能转移到另一条促销'});
+    }
+    final errors = draft.validationErrors(current);
+    if (errors.isNotEmpty) throw MarketingValidationException(errors);
+    final updated = draft.toAdvertisement(
+      adId,
+      existing.createdAt,
+      DateTime.now(),
+    );
+    await _persist(
+      current.copyWith(
+        advertisements: current.advertisements
+            .map((item) => item.adId == adId ? updated : item)
+            .toList(growable: false),
+      ),
+    );
+    return updated;
+  }
+
+  @override
+  Future<void> deleteAdvertisement(int adId) async {
+    final current = await _current();
+    if (!current.advertisements.any((item) => item.adId == adId)) {
+      throw StateError('广告不存在');
+    }
+    await _persist(
+      current.copyWith(
+        advertisements: current.advertisements
+            .where((item) => item.adId != adId)
+            .toList(),
+      ),
+    );
+  }
+
+  @override
+  Future<MarketingSnapshot> resetDemoData() async {
+    const empty = MarketingSnapshot();
+    await _persist(empty);
+    return empty;
   }
 }
 

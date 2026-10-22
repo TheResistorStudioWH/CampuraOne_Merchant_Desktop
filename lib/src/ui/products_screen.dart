@@ -9,6 +9,7 @@ import '../state/app_state.dart';
 import 'app_theme.dart';
 import 'common.dart';
 import 'product_editor.dart';
+import 'workspace_resize_handle.dart';
 
 class ProductsScreen extends ConsumerStatefulWidget {
   const ProductsScreen({super.key});
@@ -22,11 +23,50 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   final _searchFocus = FocusNode();
   final _editorKey = GlobalKey<ProductEditorState>();
   int? _categoryId;
-  var _ownership = ProductOwnership.all;
+  var _shopScope = 'all';
   var _sort = ProductSort.updatedDesc;
   int? _selectedId;
   var _editing = false;
   var _creating = false;
+  double? _dragListWidth;
+
+  double _listWidth(double contentWidth, double? preferredWidth) {
+    final defaultWidth = contentWidth < 1020 ? 370.0 : 420.0;
+    return (preferredWidth ?? defaultWidth).clamp(300.0, contentWidth - 360.0);
+  }
+
+  void _updateListWidth(double delta, double contentWidth) {
+    final savedWidth = ref
+        .read(appControllerProvider)
+        .appearance
+        .productListWidth;
+    setState(() {
+      _dragListWidth =
+          (_dragListWidth ?? _listWidth(contentWidth, savedWidth)) + delta;
+    });
+  }
+
+  Future<void> _finishListResize(double contentWidth) async {
+    final draggedWidth = _dragListWidth;
+    if (draggedWidth == null) {
+      return;
+    }
+    final settings = ref.read(appControllerProvider).appearance;
+    final width = _listWidth(contentWidth, draggedWidth);
+    final save = ref
+        .read(appControllerProvider.notifier)
+        .setAppearance(settings.copyWith(productListWidth: width));
+    setState(() => _dragListWidth = null);
+    await save;
+  }
+
+  Future<void> _resetListWidth() async {
+    final settings = ref.read(appControllerProvider).appearance;
+    setState(() => _dragListWidth = null);
+    await ref
+        .read(appControllerProvider.notifier)
+        .setAppearance(settings.copyWith(productListWidth: null));
+  }
 
   @override
   void dispose() {
@@ -128,26 +168,48 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       return const Center(child: Text('商品数据暂不可用'));
     }
     final permittedShops = appState.session?.shopIds.toSet() ?? <int>{};
+    final managedMainShops = catalog.mainShops
+        .where(
+          (shop) =>
+              permittedShops.isEmpty || permittedShops.contains(shop.shopId),
+        )
+        .toList(growable: false);
     final ownedProducts = catalog.products.where(
       (product) =>
           permittedShops.isEmpty || permittedShops.contains(product.mainShopId),
     );
+    final selectedMainShopId = _shopScope.startsWith('main:')
+        ? int.tryParse(_shopScope.substring(5))
+        : null;
+    final selectedSubShopId = _shopScope.startsWith('sub:')
+        ? int.tryParse(_shopScope.substring(4))
+        : null;
     final products = ProductQuery(
       search: _searchController.text,
       categoryId: _categoryId,
-      ownership: _ownership,
+      mainShopId: selectedMainShopId,
+      subShopId: selectedSubShopId,
+      ownership: selectedMainShopId == null
+          ? ProductOwnership.all
+          : ProductOwnership.direct,
       sort: _sort,
     ).apply(ownedProducts);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 860;
+        final listWidth = _listWidth(
+          constraints.maxWidth,
+          _dragListWidth ?? appState.appearance.productListWidth,
+        );
         Product? selected;
         if (_selectedId != null) {
-          selected = catalog.productById(_selectedId!);
+          selected = products
+              .where((product) => product.productId == _selectedId)
+              .firstOrNull;
         }
         selected ??= products.isEmpty ? null : products.first;
-        _selectedId ??= selected?.productId;
+        _selectedId = selected?.productId;
 
         return CallbackShortcuts(
           bindings: {
@@ -178,14 +240,20 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                   searchFocus: _searchFocus,
                   categories: catalog.categories,
                   categoryId: _categoryId,
-                  ownership: _ownership,
+                  mainShops: managedMainShops,
+                  subShops: catalog.subShops,
+                  shopScope: _shopScope,
                   sort: _sort,
                   resultCount: products.length,
                   onSearchChanged: (_) => setState(() {}),
                   onCategoryChanged: (value) =>
                       setState(() => _categoryId = value),
-                  onOwnershipChanged: (value) =>
-                      setState(() => _ownership = value),
+                  onShopScopeChanged: (value) => setState(() {
+                    _shopScope = value;
+                    _selectedId = null;
+                    _editing = false;
+                    _creating = false;
+                  }),
                   onSortChanged: (value) => setState(() => _sort = value),
                   onAdd: () => _startNew(wide),
                 ),
@@ -195,7 +263,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                       ? Row(
                           children: [
                             SizedBox(
-                              width: constraints.maxWidth < 1020 ? 370 : 420,
+                              key: const Key('product-list-pane'),
+                              width: listWidth,
                               child: _ProductList(
                                 products: products,
                                 catalog: catalog,
@@ -206,7 +275,17 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                                 onClearFilters: _clearFilters,
                               ),
                             ),
-                            const VerticalDivider(width: 1),
+                            WorkspaceResizeHandle(
+                              key: const Key('product-resize-handle'),
+                              tooltip: '拖动调整商品列表宽度，双击恢复自动宽度',
+                              onDrag: (delta) =>
+                                  _updateListWidth(delta, constraints.maxWidth),
+                              onDragEnd: () =>
+                                  _finishListResize(constraints.maxWidth),
+                              onDragCancel: () =>
+                                  setState(() => _dragListWidth = null),
+                              onDoubleTap: _resetListWidth,
+                            ),
                             Expanded(
                               child: _creating || _editing
                                   ? ProductEditor(
@@ -255,7 +334,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     _searchController.clear();
     setState(() {
       _categoryId = null;
-      _ownership = ProductOwnership.all;
+      _shopScope = 'all';
       _sort = ProductSort.updatedDesc;
     });
   }
@@ -362,12 +441,14 @@ class _ProductToolbar extends StatelessWidget {
     required this.searchFocus,
     required this.categories,
     required this.categoryId,
-    required this.ownership,
+    required this.mainShops,
+    required this.subShops,
+    required this.shopScope,
     required this.sort,
     required this.resultCount,
     required this.onSearchChanged,
     required this.onCategoryChanged,
-    required this.onOwnershipChanged,
+    required this.onShopScopeChanged,
     required this.onSortChanged,
     required this.onAdd,
   });
@@ -376,12 +457,14 @@ class _ProductToolbar extends StatelessWidget {
   final FocusNode searchFocus;
   final List<ProductCategory> categories;
   final int? categoryId;
-  final ProductOwnership ownership;
+  final List<MainShop> mainShops;
+  final List<SubShop> subShops;
+  final String shopScope;
   final ProductSort sort;
   final int resultCount;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<int?> onCategoryChanged;
-  final ValueChanged<ProductOwnership> onOwnershipChanged;
+  final ValueChanged<String> onShopScopeChanged;
   final ValueChanged<ProductSort> onSortChanged;
   final VoidCallback onAdd;
 
@@ -395,11 +478,6 @@ class _ProductToolbar extends StatelessWidget {
                   .map((category) => category.categoryName)
                   .firstOrNull ??
               '全部分类';
-    final ownershipLabel = switch (ownership) {
-      ProductOwnership.all => '全部归属',
-      ProductOwnership.direct => '主商户直营',
-      ProductOwnership.subShop => '附属商户',
-    };
     final sortLabel = switch (sort) {
       ProductSort.updatedDesc => '最近更新',
       ProductSort.updatedAsc => '最早更新',
@@ -477,24 +555,11 @@ class _ProductToolbar extends StatelessWidget {
                     ],
                     onChanged: onCategoryChanged,
                   ),
-                  _FilterMenu<ProductOwnership>(
-                    value: ownership,
-                    label: ownershipLabel,
-                    tooltip: '按商户归属筛选',
-                    icon: Icons.store_outlined,
-                    active: ownership != ProductOwnership.all,
-                    options: const [
-                      _FilterOption(value: ProductOwnership.all, label: '全部归属'),
-                      _FilterOption(
-                        value: ProductOwnership.direct,
-                        label: '主商户直营',
-                      ),
-                      _FilterOption(
-                        value: ProductOwnership.subShop,
-                        label: '附属商户',
-                      ),
-                    ],
-                    onChanged: onOwnershipChanged,
+                  _ShopScopeMenu(
+                    value: shopScope,
+                    mainShops: mainShops,
+                    subShops: subShops,
+                    onChanged: onShopScopeChanged,
                   ),
                   _FilterMenu<ProductSort>(
                     value: sort,
@@ -531,6 +596,158 @@ class _ProductToolbar extends StatelessWidget {
                 ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ShopScopeMenu extends StatelessWidget {
+  const _ShopScopeMenu({
+    required this.value,
+    required this.mainShops,
+    required this.subShops,
+    required this.onChanged,
+  });
+
+  final String value;
+  final List<MainShop> mainShops;
+  final List<SubShop> subShops;
+  final ValueChanged<String> onChanged;
+
+  String get _selectedLabel {
+    if (value.startsWith('main:')) {
+      final id = int.tryParse(value.substring(5));
+      final shop = mainShops.where((item) => item.shopId == id).firstOrNull;
+      return shop == null ? '全部管理范围' : '${shop.shopName} · 直营';
+    }
+    if (value.startsWith('sub:')) {
+      final id = int.tryParse(value.substring(4));
+      final shop = subShops.where((item) => item.shopId == id).firstOrNull;
+      return shop == null ? '全部管理范围' : '${shop.shopName} · 代管';
+    }
+    return '全部管理范围';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MenuAnchor(
+      menuChildren: [
+        MenuItemButton(
+          key: const Key('product-scope-all'),
+          onPressed: () => onChanged('all'),
+          child: _ScopeMenuItemContent(
+            icon: Icons.admin_panel_settings_outlined,
+            title: '全部可管理商品',
+            subtitle: '主账号的完整管理范围',
+            selected: value == 'all',
+          ),
+        ),
+        const Divider(height: 1),
+        for (final mainShop in mainShops) ...[
+          MenuItemButton(
+            key: Key('product-scope-main-${mainShop.shopId}'),
+            onPressed: () => onChanged('main:${mainShop.shopId}'),
+            child: _ScopeMenuItemContent(
+              icon: Icons.storefront_rounded,
+              title: mainShop.shopName,
+              subtitle: '主商户直营 · 当前主账号',
+              selected: value == 'main:${mainShop.shopId}',
+            ),
+          ),
+          for (final subShop in subShops.where(
+            (item) => item.mainShopId == mainShop.shopId,
+          ))
+            MenuItemButton(
+              key: Key('product-scope-sub-${subShop.shopId}'),
+              onPressed: () => onChanged('sub:${subShop.shopId}'),
+              child: _ScopeMenuItemContent(
+                icon: Icons.subdirectory_arrow_right_rounded,
+                title: subShop.shopName,
+                subtitle: '子商户独立账号 · 主商户可代管',
+                selected: value == 'sub:${subShop.shopId}',
+                indented: true,
+              ),
+            ),
+        ],
+      ],
+      builder: (context, controller, child) => Tooltip(
+        message: '按主商户管理范围筛选',
+        child: FilterChip(
+          key: const Key('product-scope-filter'),
+          selected: value != 'all',
+          showCheckmark: false,
+          avatar: const Icon(Icons.account_tree_outlined, size: 18),
+          label: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_selectedLabel),
+              const SizedBox(width: 4),
+              const Icon(Icons.arrow_drop_down_rounded, size: 20),
+            ],
+          ),
+          onSelected: (_) {
+            controller.isOpen ? controller.close() : controller.open();
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _ScopeMenuItemContent extends StatelessWidget {
+  const _ScopeMenuItemContent({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    this.indented = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final bool indented;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: 286,
+      height: 48,
+      child: Padding(
+        padding: EdgeInsets.only(left: indented ? 20 : 0),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: scheme.onSurfaceVariant),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+            if (selected) ...[
+              const SizedBox(width: 12),
+              Icon(Icons.check_rounded, size: 18, color: scheme.primary),
+            ],
           ],
         ),
       ),
@@ -630,9 +847,10 @@ class _ProductList extends StatelessWidget {
     }
     return ListView.separated(
       key: const Key('product-list'),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       itemCount: products.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 8),
+      separatorBuilder: (context, index) =>
+          const Divider(height: 1, indent: 84, endIndent: 10),
       itemBuilder: (context, index) {
         final product = products[index];
         return _ProductListTile(
@@ -666,18 +884,12 @@ class _ProductListTile extends StatelessWidget {
     final subShop = catalog.subShopById(product.subShopId);
     return Material(
       color: selected ? scheme.secondaryContainer : scheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(
-          color: selected ? scheme.secondary : scheme.outlineVariant,
-          width: selected ? 1.5 : 1,
-        ),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         key: Key('product-item-${product.productId}'),
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(12),
         hoverColor: scheme.primary.withValues(alpha: 0.06),
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -719,7 +931,7 @@ class _ProductListTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 7),
                     Text(
-                      '${category?.categoryName ?? '未分类'}  ·  ${subShop?.shopName ?? '主商户直营'}',
+                      '${category?.categoryName ?? '未分类'}  ·  ${subShop == null ? '主店直营' : '代管 · ${subShop.shopName}'}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall
@@ -727,14 +939,6 @@ class _ProductListTile extends StatelessWidget {
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 4),
-              Icon(
-                selected
-                    ? Icons.check_circle_rounded
-                    : Icons.chevron_right_rounded,
-                size: 20,
-                color: selected ? scheme.secondary : scheme.onSurfaceVariant,
               ),
             ],
           ),
@@ -876,7 +1080,9 @@ class ProductDetailsPane extends StatelessWidget {
                           icon: value.subShopId == null
                               ? Icons.store_rounded
                               : Icons.account_tree_rounded,
-                          label: subShop?.shopName ?? '主商户直营',
+                          label: subShop == null
+                              ? '主店直营'
+                              : '主商户代管 · ${subShop.shopName}',
                           color: scheme.secondary,
                         ),
                       ],
@@ -931,6 +1137,14 @@ class ProductDetailsPane extends StatelessWidget {
                             _DetailRow(
                               label: '主商户',
                               value: mainShop?.shopName ?? '未知',
+                            ),
+                            _DetailRow(
+                              label: '商品目录',
+                              value: subShop?.shopName ?? '主店直营目录',
+                            ),
+                            _DetailRow(
+                              label: '管理关系',
+                              value: subShop == null ? '当前主账号直营' : '主商户向下代管',
                             ),
                             _DetailRow(
                               label: '商品 ID',

@@ -154,10 +154,21 @@ class ProductEditorState extends ConsumerState<ProductEditor> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final availableSubShops = widget.catalog.subShops
-        .where((shop) => shop.mainShopId == _mainShopId)
+    final permittedShopIds = ref.watch(
+      appControllerProvider.select(
+        (state) => state.session?.shopIds.toSet() ?? <int>{},
+      ),
+    );
+    final availableMainShops = widget.catalog.mainShops
+        .where(
+          (shop) =>
+              permittedShopIds.isEmpty ||
+              permittedShopIds.contains(shop.shopId),
+        )
         .toList(growable: false);
-    final ownershipValue = _subShopId == null ? 'direct' : 'sub:$_subShopId';
+    final destinationValue = _subShopId == null
+        ? 'main:$_mainShopId'
+        : 'sub:$_subShopId';
 
     return CallbackShortcuts(
       bindings: {
@@ -273,73 +284,97 @@ class ProductEditorState extends ConsumerState<ProductEditor> {
                           ),
                           const SizedBox(height: 28),
                           const _SectionHeading(
-                            icon: Icons.storefront_rounded,
-                            title: '归属与分类',
-                            subtitle: '直营商品不关联附属商户。',
+                            icon: Icons.account_tree_rounded,
+                            title: '商品归属',
+                            subtitle: '选择商品上架目录。主商户可维护直营目录，也可代管名下子商户。',
                           ),
                           const SizedBox(height: 16),
-                          DropdownButtonFormField<int>(
-                            key: const Key('product-main-shop'),
-                            initialValue: _mainShopId,
+                          DropdownButtonFormField<String>(
+                            key: const Key('product-ownership'),
+                            initialValue: destinationValue,
+                            isExpanded: true,
+                            itemHeight: 64,
                             decoration: const InputDecoration(
-                              labelText: '主商户 *',
+                              labelText: '上架到 *',
+                              helperText: '子商户拥有独立账号；当前主账号具有向下代管权限。',
                             ),
                             items: [
-                              for (final shop in widget.catalog.mainShops)
+                              for (final mainShop in availableMainShops) ...[
                                 DropdownMenuItem(
-                                  value: shop.shopId,
-                                  child: Text(shop.shopName),
+                                  value: 'main:${mainShop.shopId}',
+                                  child: _DestinationOption(
+                                    icon: Icons.storefront_rounded,
+                                    title: mainShop.shopName,
+                                    subtitle: '主商户直营 · 当前主账号',
+                                  ),
                                 ),
+                                for (final subShop
+                                    in widget.catalog.subShops.where(
+                                      (shop) =>
+                                          shop.mainShopId == mainShop.shopId,
+                                    ))
+                                  DropdownMenuItem(
+                                    value: 'sub:${subShop.shopId}',
+                                    child: _DestinationOption(
+                                      icon: Icons
+                                          .subdirectory_arrow_right_rounded,
+                                      title: subShop.shopName,
+                                      subtitle: '子商户独立账号 · 主商户可代管',
+                                      indented: true,
+                                    ),
+                                  ),
+                              ],
+                            ],
+                            selectedItemBuilder: (context) => [
+                              for (final mainShop in availableMainShops) ...[
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    '${mainShop.shopName} · 主店直营',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                for (final subShop
+                                    in widget.catalog.subShops.where(
+                                      (shop) =>
+                                          shop.mainShopId == mainShop.shopId,
+                                    ))
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      '${subShop.shopName} · 主商户代管',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                              ],
                             ],
                             onChanged: (value) {
                               if (value == null) {
                                 return;
                               }
                               setState(() {
-                                _mainShopId = value;
-                                final valid = widget.catalog.subShops.any(
-                                  (shop) =>
-                                      shop.shopId == _subShopId &&
-                                      shop.mainShopId == value,
-                                );
-                                if (!valid) {
+                                if (value.startsWith('main:')) {
+                                  _mainShopId = int.parse(value.substring(5));
                                   _subShopId = null;
+                                } else {
+                                  final subShopId = int.parse(
+                                    value.substring(4),
+                                  );
+                                  final subShop = widget.catalog.subShopById(
+                                    subShopId,
+                                  );
+                                  if (subShop != null) {
+                                    _mainShopId = subShop.mainShopId;
+                                    _subShopId = subShop.shopId;
+                                  }
                                 }
                               });
                               _markDirty();
                             },
                             validator: (value) =>
-                                value == null || value == 0 ? '请选择主商户' : null,
-                          ),
-                          const SizedBox(height: 16),
-                          DropdownButtonFormField<String>(
-                            key: const Key('product-ownership'),
-                            initialValue: ownershipValue,
-                            decoration: const InputDecoration(
-                              labelText: '商户归属 *',
-                            ),
-                            items: [
-                              const DropdownMenuItem(
-                                value: 'direct',
-                                child: Text('主商户直营'),
-                              ),
-                              for (final shop in availableSubShops)
-                                DropdownMenuItem(
-                                  value: 'sub:${shop.shopId}',
-                                  child: Text('附属商户 · ${shop.shopName}'),
-                                ),
-                            ],
-                            onChanged: (value) {
-                              if (value == null) {
-                                return;
-                              }
-                              setState(() {
-                                _subShopId = value == 'direct'
-                                    ? null
-                                    : int.parse(value.substring(4));
-                              });
-                              _markDirty();
-                            },
+                                value == null ? '请选择商品所属目录' : null,
                           ),
                           const SizedBox(height: 16),
                           DropdownButtonFormField<int?>(
@@ -435,6 +470,55 @@ class ProductEditorState extends ConsumerState<ProductEditor> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _DestinationOption extends StatelessWidget {
+  const _DestinationOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.indented = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool indented;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: EdgeInsets.only(left: indented ? 20 : 0),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: scheme.onSurfaceVariant),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

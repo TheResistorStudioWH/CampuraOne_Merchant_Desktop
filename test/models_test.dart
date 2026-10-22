@@ -76,6 +76,19 @@ void main() {
             .map((item) => item.productId),
         [2],
       );
+      expect(
+        const ProductQuery(subShopId: 1)
+            .apply([...products, _product(4, '另一子商户商品', 900, subShopId: 2)])
+            .map((item) => item.productId),
+        [2],
+      );
+      expect(
+        const ProductQuery(
+          mainShopId: 1,
+          ownership: ProductOwnership.direct,
+        ).apply(products).map((item) => item.productId),
+        [3, 1],
+      );
     });
 
     test('按价格排序', () {
@@ -94,7 +107,7 @@ void main() {
     });
   });
 
-  test('附属商户必须属于当前主商户', () {
+  test('子商户必须属于当前主商户', () {
     final catalog = CatalogSnapshot(
       mainShops: const [
         MainShop(shopId: 1, shopName: 'A', schoolId: 1, accountId: 1),

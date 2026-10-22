@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/repositories.dart';
 import '../domain/appearance.dart';
+import '../domain/marketing_models.dart';
 import '../domain/models.dart';
 
 const _noChange = Object();
@@ -21,12 +22,17 @@ final appearanceRepositoryProvider = Provider<AppearanceRepository>((ref) {
   throw UnimplementedError('AppearanceRepository 必须在 ProviderScope 中覆盖');
 });
 
+final marketingRepositoryProvider = Provider<MarketingRepository>((ref) {
+  throw UnimplementedError('MarketingRepository 必须在 ProviderScope 中覆盖');
+});
+
 class AppState {
   const AppState({
     this.initialized = false,
     this.busy = false,
     this.session,
     this.catalog,
+    this.marketing,
     this.appearance = const AppearanceSettings(),
     this.notice,
     this.error,
@@ -36,6 +42,7 @@ class AppState {
   final bool busy;
   final MerchantSession? session;
   final CatalogSnapshot? catalog;
+  final MarketingSnapshot? marketing;
   final AppearanceSettings appearance;
   final String? notice;
   final String? error;
@@ -45,6 +52,7 @@ class AppState {
     bool? busy,
     Object? session = _noChange,
     Object? catalog = _noChange,
+    Object? marketing = _noChange,
     AppearanceSettings? appearance,
     Object? notice = _noChange,
     Object? error = _noChange,
@@ -58,6 +66,9 @@ class AppState {
       catalog: identical(catalog, _noChange)
           ? this.catalog
           : catalog as CatalogSnapshot?,
+      marketing: identical(marketing, _noChange)
+          ? this.marketing
+          : marketing as MarketingSnapshot?,
       appearance: appearance ?? this.appearance,
       notice: identical(notice, _noChange) ? this.notice : notice as String?,
       error: identical(error, _noChange) ? this.error : error as String?,
@@ -74,6 +85,7 @@ class AppController extends Notifier<AppState> {
 
   AuthRepository get _auth => ref.read(authRepositoryProvider);
   CatalogRepository get _catalog => ref.read(catalogRepositoryProvider);
+  MarketingRepository get _marketing => ref.read(marketingRepositoryProvider);
   AppearanceRepository get _appearance =>
       ref.read(appearanceRepositoryProvider);
 
@@ -92,16 +104,19 @@ class AppController extends Notifier<AppState> {
     try {
       final sessionResult = await _auth.restoreSession();
       final catalogResult = await _catalog.loadCatalog();
+      final marketingResult = await _marketing.loadMarketing();
       final appearanceResult = await _appearance.loadAppearance();
       final notices = [
         sessionResult.recoveryNotice,
         catalogResult.recoveryNotice,
+        marketingResult.recoveryNotice,
         appearanceResult.recoveryNotice,
       ].whereType<String>().join('\n');
       state = AppState(
         initialized: true,
         session: sessionResult.value,
         catalog: catalogResult.value,
+        marketing: marketingResult.value,
         appearance: appearanceResult.value,
         notice: notices.isEmpty ? null : notices,
       );
@@ -197,6 +212,13 @@ class AppController extends Notifier<AppState> {
     if (current == null || state.busy) {
       return false;
     }
+    if (state.marketing?.promotions.any(
+          (event) => event.productId == product.productId,
+        ) ==
+        true) {
+      state = state.copyWith(error: '该商品关联了促销，请先在营销工作台处理相关促销。');
+      return false;
+    }
     state = state.copyWith(busy: true, error: null);
     try {
       await _catalog.deleteProduct(product.productId);
@@ -223,10 +245,114 @@ class AppController extends Notifier<AppState> {
     state = state.copyWith(busy: true, error: null);
     try {
       final catalog = await _catalog.resetDemoData();
+      state = state.copyWith(catalog: catalog);
+      final marketing = await _marketing.resetDemoData();
       state = state.copyWith(
         busy: false,
         catalog: catalog,
-        notice: '已恢复标准演示商品，登录状态保持不变。',
+        marketing: marketing,
+        notice: '已恢复标准演示数据，登录状态保持不变。',
+      );
+      return true;
+    } catch (error) {
+      state = state.copyWith(busy: false, error: _message(error));
+      return false;
+    }
+  }
+
+  Future<PromotionEvent?> savePromotion(
+    PromotionDraft draft, {
+    int? saleId,
+  }) async {
+    final current = state.marketing;
+    final catalog = state.catalog;
+    if (current == null || catalog == null || state.busy) return null;
+    state = state.copyWith(busy: true, error: null);
+    try {
+      final saved = saleId == null
+          ? await _marketing.createPromotion(draft, catalog)
+          : await _marketing.updatePromotion(saleId, draft, catalog);
+      final next = saleId == null
+          ? [...current.promotions, saved]
+          : current.promotions
+                .map((item) => item.saleId == saleId ? saved : item)
+                .toList(growable: false);
+      state = state.copyWith(
+        busy: false,
+        marketing: current.copyWith(promotions: next),
+        notice: saleId == null ? '已创建本地促销' : '已保存本地促销',
+      );
+      return saved;
+    } catch (error) {
+      state = state.copyWith(busy: false, error: _message(error));
+      return null;
+    }
+  }
+
+  Future<bool> deletePromotion(int saleId) async {
+    final current = state.marketing;
+    if (current == null || state.busy) return false;
+    state = state.copyWith(busy: true, error: null);
+    try {
+      await _marketing.deletePromotion(saleId);
+      state = state.copyWith(
+        busy: false,
+        marketing: current.copyWith(
+          promotions: current.promotions
+              .where((item) => item.saleId != saleId)
+              .toList(),
+        ),
+        notice: '已删除本地促销',
+      );
+      return true;
+    } catch (error) {
+      state = state.copyWith(busy: false, error: _message(error));
+      return false;
+    }
+  }
+
+  Future<Advertisement?> saveAdvertisement(
+    AdvertisementDraft draft, {
+    int? adId,
+  }) async {
+    final current = state.marketing;
+    if (current == null || state.busy) return null;
+    state = state.copyWith(busy: true, error: null);
+    try {
+      final saved = adId == null
+          ? await _marketing.createAdvertisement(draft)
+          : await _marketing.updateAdvertisement(adId, draft);
+      final next = adId == null
+          ? [...current.advertisements, saved]
+          : current.advertisements
+                .map((item) => item.adId == adId ? saved : item)
+                .toList(growable: false);
+      state = state.copyWith(
+        busy: false,
+        marketing: current.copyWith(advertisements: next),
+        notice: adId == null ? '已添加本地广告预览' : '已保存本地广告预览',
+      );
+      return saved;
+    } catch (error) {
+      state = state.copyWith(busy: false, error: _message(error));
+      return null;
+    }
+  }
+
+  Future<bool> deleteAdvertisement(int adId) async {
+    final current = state.marketing;
+    if (current == null || state.busy) return false;
+    state = state.copyWith(busy: true, error: null);
+    try {
+      await _marketing.deleteAdvertisement(adId);
+      state = state.copyWith(
+        busy: false,
+        marketing: current.copyWith(
+          advertisements: current.advertisements
+              .where((item) => item.adId != adId)
+              .toList(),
+        ),
+        notice: '已删除本地广告预览',
       );
       return true;
     } catch (error) {
@@ -271,6 +397,9 @@ String _message(Object error) {
     return error.message;
   }
   if (error is CatalogValidationException) {
+    return error.errors.values.join('；');
+  }
+  if (error is MarketingValidationException) {
     return error.errors.values.join('；');
   }
   if (error is FileSystemException) {

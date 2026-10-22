@@ -8,6 +8,7 @@ import 'ui/app_shell.dart';
 import 'ui/app_theme.dart';
 import 'ui/dashboard_screen.dart';
 import 'ui/login_screen.dart';
+import 'ui/marketing_screen.dart';
 import 'ui/products_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -67,6 +68,10 @@ final routerProvider = Provider<GoRouter>((ref) {
                 },
               ),
             ],
+          ),
+          GoRoute(
+            path: '/marketing',
+            builder: (context, state) => const MarketingScreen(),
           ),
         ],
       ),

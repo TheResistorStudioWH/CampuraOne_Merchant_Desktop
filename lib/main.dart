@@ -20,6 +20,9 @@ Future<void> main() async {
   final appearanceRepository = LocalAppearanceRepository(
     supportDirectory: supportDirectory,
   );
+  final marketingRepository = LocalMarketingRepository(
+    supportDirectory: supportDirectory,
+  );
 
   runApp(
     ProviderScope(
@@ -27,6 +30,7 @@ Future<void> main() async {
         authRepositoryProvider.overrideWithValue(authRepository),
         catalogRepositoryProvider.overrideWithValue(catalogRepository),
         appearanceRepositoryProvider.overrideWithValue(appearanceRepository),
+        marketingRepositoryProvider.overrideWithValue(marketingRepository),
       ],
       child: const MerchantApp(),
     ),
