@@ -1,8 +1,10 @@
 #include "flutter_window.h"
 
 #include <optional>
+#include <windows.h>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "desktop_multi_window/desktop_multi_window_plugin.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -25,6 +27,22 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  DesktopMultiWindowSetWindowCreatedCallback([](void* controller) {
+    auto* flutter_view_controller =
+        reinterpret_cast<flutter::FlutterViewController*>(controller);
+    RegisterPlugins(flutter_view_controller->engine());
+    HWND window = GetAncestor(
+        flutter_view_controller->view()->GetNativeWindow(), GA_ROOT);
+    if (window != nullptr) {
+      SetWindowTextW(window,
+                     L"\u57df\u6821\u5c7f\u5546\u5bb6 \u00b7 \u89c6\u89c9\u5206\u6790");
+      const UINT dpi = GetDpiForWindow(window);
+      const int width = MulDiv(980, dpi, 96);
+      const int height = MulDiv(760, dpi, 96);
+      SetWindowPos(window, nullptr, 0, 0, width, height,
+                   SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+  });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {

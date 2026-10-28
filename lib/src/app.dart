@@ -91,7 +91,7 @@ class MerchantApp extends ConsumerWidget {
       appControllerProvider.select((state) => state.appearance),
     );
     return MaterialApp.router(
-      title: 'Campura One 商家端',
+      title: '域校屿商家',
       debugShowCheckedModeBanner: false,
       themeMode: materialThemeMode(appearance.brightness),
       theme: buildMerchantTheme(Brightness.light, appearance.preset),
@@ -138,7 +138,7 @@ class _LoadingScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Campura One 商家端',
+                  '域校屿商家',
                   style: Theme.of(context).textTheme.titleLarge
                       ?.copyWith(fontWeight: FontWeight.w700),
                 ),

@@ -19,35 +19,18 @@ class DashboardScreen extends ConsumerWidget {
       return const Center(child: Text('商品数据暂不可用'));
     }
     final permittedShopIds = appState.session?.shopIds.toSet() ?? <int>{};
-    final managedMainShops = catalog.mainShops
-        .where(
-          (shop) =>
-              permittedShopIds.isEmpty ||
-              permittedShopIds.contains(shop.shopId),
-        )
-        .toList(growable: false);
-    final managedMainShopIds = managedMainShops
-        .map((shop) => shop.shopId)
-        .toSet();
-    final managedSubShops = catalog.subShops
-        .where((shop) => managedMainShopIds.contains(shop.mainShopId))
-        .toList(growable: false);
+    final managedSubShopCount = catalog.subShops
+        .where((shop) => permittedShopIds.isEmpty || permittedShopIds.contains(shop.mainShopId))
+        .length;
     final products = catalog.products
         .where(
-          (product) =>
-              permittedShopIds.isEmpty ||
-              permittedShopIds.contains(product.mainShopId),
+          (product) => permittedShopIds.isEmpty || permittedShopIds.contains(product.mainShopId),
         )
         .toList(growable: false);
     final directCount = products.where((item) => item.subShopId == null).length;
     final subShopCount = products.length - directCount;
-    final usedCategories = products
-        .map((item) => item.categoryId)
-        .whereType<int>()
-        .toSet()
-        .length;
-    final recent = [...products]
-      ..sort((left, right) => right.updatedAt.compareTo(left.updatedAt));
+    final usedCategories = products.map((item) => item.categoryId).whereType<int>().toSet().length;
+    final recent = [...products]..sort((left, right) => right.updatedAt.compareTo(left.updatedAt));
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -59,7 +42,7 @@ class DashboardScreen extends ConsumerWidget {
             children: [
               _DashboardHero(
                 productCount: products.length,
-                managedSubShopCount: managedSubShops.length,
+                managedSubShopCount: managedSubShopCount,
                 onAdd: () => context.go('/products/new'),
               ),
               const SizedBox(height: 20),
@@ -70,22 +53,13 @@ class DashboardScreen extends ConsumerWidget {
                 categoryCount: usedCategories,
               ),
               const SizedBox(height: 24),
-              _ManagementHierarchy(
-                mainShops: managedMainShops,
-                subShops: managedSubShops,
-                products: products,
-              ),
-              const SizedBox(height: 24),
               if (twoColumns)
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       flex: 5,
-                      child: _CategoryDistribution(
-                        products: products,
-                        catalog: catalog,
-                      ),
+                      child: _CategoryDistribution(products: products, catalog: catalog),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -100,10 +74,7 @@ class DashboardScreen extends ConsumerWidget {
               else ...[
                 _CategoryDistribution(products: products, catalog: catalog),
                 const SizedBox(height: 16),
-                _RecentProducts(
-                  products: recent.take(5).toList(growable: false),
-                  catalog: catalog,
-                ),
+                _RecentProducts(products: recent.take(5).toList(growable: false), catalog: catalog),
               ],
             ],
           ),
@@ -137,15 +108,8 @@ class _DashboardHero extends StatelessWidget {
             Container(
               width: 54,
               height: 54,
-              decoration: BoxDecoration(
-                color: scheme.primary,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.storefront_rounded,
-                color: scheme.onPrimary,
-                size: 28,
-              ),
+              decoration: BoxDecoration(color: scheme.primary, shape: BoxShape.circle),
+              child: Icon(Icons.storefront_rounded, color: scheme.onPrimary, size: 28),
             ),
             const SizedBox(width: 18),
             Expanded(
@@ -159,10 +123,8 @@ class _DashboardHero extends StatelessWidget {
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    '当前以主商户账号管理 $managedSubShopCount 个子商户，共有 $productCount 件商品。',
-                    style: TextStyle(
-                      color: scheme.onPrimaryContainer.withValues(alpha: 0.82),
-                    ),
+                    '共管理 $productCount 件商品，覆盖 $managedSubShopCount 个子商户目录。',
+                    style: TextStyle(color: scheme.onPrimaryContainer.withValues(alpha: 0.82)),
                   ),
                   const SizedBox(height: 14),
                   FilledButton.icon(
@@ -217,12 +179,7 @@ class _MetricStrip extends StatelessWidget {
               child: Row(
                 children: [
                   for (var index = 0; index < metrics.length; index++) ...[
-                    if (index > 0)
-                      const VerticalDivider(
-                        width: 1,
-                        indent: 18,
-                        endIndent: 18,
-                      ),
+                    if (index > 0) const VerticalDivider(width: 1, indent: 18, endIndent: 18),
                     Expanded(
                       child: _MetricCell(
                         icon: metrics[index].$1,
@@ -285,11 +242,7 @@ class _MetricStrip extends StatelessWidget {
 }
 
 class _MetricCell extends StatelessWidget {
-  const _MetricCell({
-    required this.icon,
-    required this.value,
-    required this.label,
-  });
+  const _MetricCell({required this.icon, required this.value, required this.label});
 
   final IconData icon;
   final String value;
@@ -306,8 +259,7 @@ class _MetricCell extends StatelessWidget {
           const SizedBox(width: 12),
           Text(
             value,
-            style: Theme.of(context).textTheme.titleLarge
-                ?.copyWith(fontWeight: FontWeight.w700),
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -317,216 +269,6 @@ class _MetricCell extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: scheme.onSurfaceVariant),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ManagementHierarchy extends StatelessWidget {
-  const _ManagementHierarchy({
-    required this.mainShops,
-    required this.subShops,
-    required this.products,
-  });
-
-  final List<MainShop> mainShops;
-  final List<SubShop> subShops;
-  final List<Product> products;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '账号与商品目录',
-          style: Theme.of(context).textTheme.titleLarge
-              ?.copyWith(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 5),
-        Text(
-          '当前为主商户视角。层级表示管理范围，不代表正在切换账号。',
-          style: TextStyle(color: scheme.onSurfaceVariant),
-        ),
-        const SizedBox(height: 14),
-        Material(
-          color: scheme.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: BorderSide(color: scheme.outlineVariant),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            children: [
-              if (mainShops.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Text('当前账号尚未关联主商户'),
-                )
-              else
-                for (
-                  var mainIndex = 0;
-                  mainIndex < mainShops.length;
-                  mainIndex++
-                ) ...[
-                  if (mainIndex > 0) const Divider(height: 1),
-                  _HierarchyRow(
-                    key: Key('main-shop-scope-${mainShops[mainIndex].shopId}'),
-                    icon: Icons.storefront_rounded,
-                    title: mainShops[mainIndex].shopName,
-                    role: '主商户账号',
-                    detail: '当前账号 · 完整管理权',
-                    productCount: products
-                        .where(
-                          (product) =>
-                              product.mainShopId ==
-                                  mainShops[mainIndex].shopId &&
-                              product.subShopId == null,
-                        )
-                        .length,
-                  ),
-                  for (final subShop in subShops.where(
-                    (shop) => shop.mainShopId == mainShops[mainIndex].shopId,
-                  )) ...[
-                    const Divider(height: 1, indent: 70),
-                    _HierarchyRow(
-                      key: Key('sub-shop-scope-${subShop.shopId}'),
-                      icon: Icons.subdirectory_arrow_right_rounded,
-                      title: subShop.shopName,
-                      role: '独立子账号',
-                      detail: '权限较低 · 主商户可代管',
-                      productCount: products
-                          .where(
-                            (product) => product.subShopId == subShop.shopId,
-                          )
-                          .length,
-                      child: true,
-                    ),
-                  ],
-                ],
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(18, 13, 18, 14),
-                color: scheme.secondaryContainer.withValues(alpha: 0.55),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.account_tree_outlined,
-                      size: 20,
-                      color: scheme.onSecondaryContainer,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        '权限方向：主商户可管理子商户商品；子商户仅能管理自己的目录。',
-                        style: TextStyle(color: scheme.onSecondaryContainer),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _HierarchyRow extends StatelessWidget {
-  const _HierarchyRow({
-    required this.icon,
-    required this.title,
-    required this.role,
-    required this.detail,
-    required this.productCount,
-    super.key,
-    this.child = false,
-  });
-
-  final IconData icon;
-  final String title;
-  final String role;
-  final String detail;
-  final int productCount;
-  final bool child;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(child ? 42 : 18, 15, 18, 15),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: child ? scheme.tertiaryContainer : scheme.primaryContainer,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              icon,
-              size: 21,
-              color: child
-                  ? scheme.onTertiaryContainer
-                  : scheme.onPrimaryContainer,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: scheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                      child: Text(
-                        role,
-                        style: Theme.of(context).textTheme.labelSmall,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Text(detail, style: TextStyle(color: scheme.onSurfaceVariant)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '$productCount',
-                style: Theme.of(context).textTheme.titleLarge
-                    ?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              Text(
-                child ? '代管商品' : '直营商品',
-                style: Theme.of(context).textTheme.bodySmall
-                    ?.copyWith(color: scheme.onSurfaceVariant),
-              ),
-            ],
           ),
         ],
       ),
@@ -548,11 +290,7 @@ class _CategoryDistribution extends StatelessWidget {
       if (product.categoryId == null) {
         uncategorized++;
       } else {
-        counts.update(
-          product.categoryId!,
-          (value) => value + 1,
-          ifAbsent: () => 1,
-        );
+        counts.update(product.categoryId!, (value) => value + 1, ifAbsent: () => 1);
       }
     }
     final rows = catalog.categories
@@ -572,15 +310,12 @@ class _CategoryDistribution extends StatelessWidget {
           children: [
             Text(
               '分类分布',
-              style: Theme.of(context).textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w700),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
             Text(
               '按当前商品数量统计',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 20),
             if (rows.isEmpty && uncategorized == 0)
@@ -636,10 +371,7 @@ class _DistributionRow extends StatelessWidget {
         children: [
           Icon(icon, size: 19, color: color),
           const SizedBox(width: 10),
-          SizedBox(
-            width: 82,
-            child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-          ),
+          SizedBox(width: 82, child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis)),
           const SizedBox(width: 12),
           Expanded(
             child: ClipRRect(
@@ -653,10 +385,7 @@ class _DistributionRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          SizedBox(
-            width: 20,
-            child: Text('$count', textAlign: TextAlign.right),
-          ),
+          SizedBox(width: 20, child: Text('$count', textAlign: TextAlign.right)),
         ],
       ),
     );
@@ -687,10 +416,7 @@ class _RecentProducts extends StatelessWidget {
                         ?.copyWith(fontWeight: FontWeight.w700),
                   ),
                 ),
-                TextButton(
-                  onPressed: () => context.go('/products'),
-                  child: const Text('查看全部'),
-                ),
+                TextButton(onPressed: () => context.go('/products'), child: const Text('查看全部')),
               ],
             ),
             const SizedBox(height: 8),
@@ -707,10 +433,7 @@ class _RecentProducts extends StatelessWidget {
                       children: [
                         SizedBox.square(
                           dimension: 44,
-                          child: ProductImage(
-                            assetPath: product.productImg,
-                            borderRadius: 9,
-                          ),
+                          child: ProductImage(assetPath: product.productImg, borderRadius: 9),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -721,19 +444,14 @@ class _RecentProducts extends StatelessWidget {
                                 product.productName,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
+                                style: const TextStyle(fontWeight: FontWeight.w600),
                               ),
                               const SizedBox(height: 3),
                               Text(
                                 dateFormat.format(product.updatedAt),
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                    ),
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
                               ),
                             ],
                           ),
@@ -762,9 +480,7 @@ class _InlineEmpty extends StatelessWidget {
       child: Center(
         child: Text(
           message,
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
       ),
     );

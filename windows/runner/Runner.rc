@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.LX" "\0"
-            VALUE "FileDescription", "Campura One 商家端" "\0"
+            VALUE "FileDescription", "域校屿商家" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "campura_one_merchant" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.LX. All rights reserved." "\0"
             VALUE "OriginalFilename", "campura_one_merchant.exe" "\0"
-            VALUE "ProductName", "Campura One 商家端" "\0"
+            VALUE "ProductName", "域校屿商家" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

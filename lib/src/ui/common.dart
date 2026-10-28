@@ -18,23 +18,16 @@ class BrandMark extends StatelessWidget {
       child: Icon(Icons.storefront_rounded, color: scheme.onPrimary),
     );
     if (compact) {
-      return Tooltip(message: 'Campura One 商家端', child: mark);
+      return Tooltip(message: '域校屿商家', child: mark);
     }
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         mark,
         const SizedBox(width: 12),
-        const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Campura One',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-            ),
-            Text('商家端', style: TextStyle(fontSize: 12)),
-          ],
+        const Text(
+          '域校屿商家',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
         ),
       ],
     );

@@ -78,10 +78,7 @@ void main() {
     expect(find.text('经营概览'), findsOneWidget);
     expect(find.text('商品总数'), findsOneWidget);
     expect(find.text('4'), findsOneWidget);
-    expect(find.text('账号与商品目录'), findsOneWidget);
-    expect(find.text('主商户账号'), findsOneWidget);
-    expect(find.text('独立子账号'), findsOneWidget);
-    expect(find.textContaining('子商户仅能管理自己的目录'), findsOneWidget);
+    expect(find.text('商户账户'), findsNothing);
   });
 
   testWidgets('外观面板可切换 Material 3 主题和深浅模式', (tester) async {
@@ -127,6 +124,10 @@ void main() {
 
     await tester.tap(account);
     await tester.pumpAndSettle();
+    expect(find.text('商户账户'), findsOneWidget);
+    expect(find.byKey(const Key('main-shop-scope-1')), findsOneWidget);
+    expect(find.byKey(const Key('sub-shop-scope-1')), findsOneWidget);
+    expect(find.text('独立账号 · 主商户可代管商品'), findsOneWidget);
     expect(find.text('退出登录'), findsOneWidget);
     await tester.tap(find.text('恢复标准演示数据'));
     await pumpUntilFound(tester, find.text('恢复标准演示数据？'));

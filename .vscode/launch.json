@@ -2,13 +2,13 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Campura One 商家端 (macOS)",
+      "name": "域校屿商家 (macOS)",
       "request": "launch",
       "type": "dart",
       "deviceId": "macos"
     },
     {
-      "name": "Campura One 商家端 (Windows)",
+      "name": "域校屿商家 (Windows)",
       "request": "launch",
       "type": "dart",
       "deviceId": "windows"

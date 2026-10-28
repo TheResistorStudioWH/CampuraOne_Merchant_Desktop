@@ -27,7 +27,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 800);
-  if (!window.Create(L"Campura One 商家端", origin, size)) {
+  if (!window.Create(L"\u57df\u6821\u5c7f\u5546\u5bb6", origin, size)) {
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);

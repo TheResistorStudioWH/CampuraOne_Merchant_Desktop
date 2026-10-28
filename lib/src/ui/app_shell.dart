@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../domain/models.dart';
 import '../state/app_state.dart';
+import '../vision/vision_window_service.dart';
 import 'appearance_dialog.dart';
 import 'common.dart';
 import 'workspace_resize_handle.dart';
@@ -85,6 +87,17 @@ class _MerchantAppShellState extends ConsumerState<MerchantAppShell> {
     }
   }
 
+  Future<void> _openVision(BuildContext context) async {
+    try {
+      await VisionWindowService.instance.open();
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('无法打开视觉分析窗口：$error')));
+      }
+    }
+  }
+
   Future<void> _handleAccountAction(
     BuildContext context,
     _AccountAction action,
@@ -128,19 +141,27 @@ class _MerchantAppShellState extends ConsumerState<MerchantAppShell> {
     final productsSelected = path.startsWith('/products');
     final marketingSelected = path.startsWith('/marketing');
     final catalog = appState.catalog;
-    final shopName = catalog?.mainShops.isNotEmpty == true
-        ? catalog!.mainShops.first.shopName
-        : '演示商户';
     final managedMainShopIds = appState.session?.shopIds.toSet() ?? <int>{};
-    final managedSubShopCount =
-        catalog?.subShops
+    final managedMainShops =
+        catalog?.mainShops
             .where(
               (shop) =>
                   managedMainShopIds.isEmpty ||
-                  managedMainShopIds.contains(shop.mainShopId),
+                  managedMainShopIds.contains(shop.shopId),
             )
-            .length ??
-        0;
+            .toList(growable: false) ??
+        <MainShop>[];
+    final visibleMainShopIds = managedMainShops
+        .map((shop) => shop.shopId)
+        .toSet();
+    final managedSubShops =
+        catalog?.subShops
+            .where((shop) => visibleMainShopIds.contains(shop.mainShopId))
+            .toList(growable: false) ??
+        <SubShop>[];
+    final shopName = managedMainShops.isEmpty
+        ? '未关联商户'
+        : managedMainShops.first.shopName;
 
     return Scaffold(
       body: LayoutBuilder(
@@ -159,8 +180,10 @@ class _MerchantAppShellState extends ConsumerState<MerchantAppShell> {
                 marketingSelected: marketingSelected,
                 shopName: shopName,
                 userName: appState.session?.userName ?? '',
-                managedSubShopCount: managedSubShopCount,
+                managedMainShops: managedMainShops,
+                managedSubShops: managedSubShops,
                 onNavigate: (location) => _navigate(context, location),
+                onOpenVision: () => _openVision(context),
                 onAccountAction: (action) =>
                     _handleAccountAction(context, action),
               ),
@@ -220,8 +243,10 @@ class _WorkspaceSidebar extends ConsumerWidget {
     required this.marketingSelected,
     required this.shopName,
     required this.userName,
-    required this.managedSubShopCount,
+    required this.managedMainShops,
+    required this.managedSubShops,
     required this.onNavigate,
+    required this.onOpenVision,
     required this.onAccountAction,
   });
 
@@ -231,8 +256,10 @@ class _WorkspaceSidebar extends ConsumerWidget {
   final bool marketingSelected;
   final String shopName;
   final String userName;
-  final int managedSubShopCount;
+  final List<MainShop> managedMainShops;
+  final List<SubShop> managedSubShops;
   final ValueChanged<String> onNavigate;
+  final VoidCallback onOpenVision;
   final ValueChanged<_AccountAction> onAccountAction;
 
   @override
@@ -269,7 +296,7 @@ class _WorkspaceSidebar extends ConsumerWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Campura One',
+                                      '域校屿商家',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: Theme.of(context)
@@ -332,6 +359,23 @@ class _WorkspaceSidebar extends ConsumerWidget {
                 selected: marketingSelected,
                 onTap: () => onNavigate('/marketing'),
               ),
+              const SizedBox(height: 18),
+              if (!compact)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 0, 0, 8),
+                  child: Text(
+                    '插件',
+                    style: Theme.of(context).textTheme.labelSmall
+                        ?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                ),
+              _SidebarItem(
+                key: const Key('sidebar-vision-demo'),
+                compact: compact,
+                label: '视觉分析',
+                icon: const Icon(Icons.visibility_outlined),
+                onTap: onOpenVision,
+              ),
               const Spacer(),
               Divider(
                 height: 1,
@@ -351,11 +395,11 @@ class _WorkspaceSidebar extends ConsumerWidget {
                 key: const Key('sidebar-account'),
                 tooltip: '账户菜单',
                 onSelected: onAccountAction,
-                constraints: const BoxConstraints(minWidth: 240, maxWidth: 280),
+                constraints: const BoxConstraints(minWidth: 300, maxWidth: 360),
                 itemBuilder: (context) => [
                   PopupMenuItem<_AccountAction>(
                     enabled: false,
-                    height: 74,
+                    height: 62,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -369,11 +413,21 @@ class _WorkspaceSidebar extends ConsumerWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          '主商户账号 · 管理 $managedSubShopCount 个子商户',
+                          '当前登录 · 主商户账号',
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(color: scheme.onSurfaceVariant),
                         ),
                       ],
+                    ),
+                  ),
+                  const PopupMenuDivider(),
+                  PopupMenuItem<_AccountAction>(
+                    enabled: false,
+                    height: 1,
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+                    child: _AccountScopeTree(
+                      mainShops: managedMainShops,
+                      subShops: managedSubShops,
                     ),
                   ),
                   const PopupMenuDivider(),
@@ -447,6 +501,123 @@ class _WorkspaceSidebar extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _AccountScopeTree extends StatelessWidget {
+  const _AccountScopeTree({required this.mainShops, required this.subShops});
+
+  final List<MainShop> mainShops;
+  final List<SubShop> subShops;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 260),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '商户账户',
+              style: textTheme.labelMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (mainShops.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Text('当前账号尚未关联主商户'),
+              )
+            else
+              for (final mainShop in mainShops) ...[
+                _AccountScopeRow(
+                  key: Key('main-shop-scope-${mainShop.shopId}'),
+                  icon: Icons.storefront_rounded,
+                  name: mainShop.shopName,
+                  description: '主商户 · 当前账号',
+                ),
+                for (final subShop in subShops.where(
+                  (shop) => shop.mainShopId == mainShop.shopId,
+                ))
+                  Container(
+                    margin: const EdgeInsets.only(left: 12),
+                    padding: const EdgeInsets.only(left: 12),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        left: BorderSide(color: scheme.outlineVariant),
+                      ),
+                    ),
+                    child: _AccountScopeRow(
+                      key: Key('sub-shop-scope-${subShop.shopId}'),
+                      icon: Icons.subdirectory_arrow_right_rounded,
+                      name: subShop.shopName,
+                      description: '独立账号 · 主商户可代管商品',
+                    ),
+                  ),
+              ],
+            const SizedBox(height: 8),
+            Text(
+              '此处显示当前账号的管理范围，不会切换登录身份。',
+              style: textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AccountScopeRow extends StatelessWidget {
+  const _AccountScopeRow({
+    required this.icon,
+    required this.name,
+    required this.description,
+    super.key,
+  });
+
+  final IconData icon;
+  final String name;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 19, color: scheme.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  description,
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
